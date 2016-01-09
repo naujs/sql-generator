@@ -5,11 +5,11 @@ var SqlGenerator = require('../')
 describe('SqlGenerator', () => {
   var generator;
 
-  describe('#select', () => {
-    beforeEach(() => {
-      generator = new SqlGenerator();
-    });
+  beforeEach(() => {
+    generator = new SqlGenerator();
+  });
 
+  describe('#select', () => {
     it('should return select statement', () => {
       var criteria = new DbCriteria();
       criteria.where('a', 1);
@@ -135,4 +135,31 @@ describe('SqlGenerator', () => {
       expect(result).toEqual('SELECT * FROM test LIMIT 10');
     });
   });
+
+  describe('#insert', () => {
+    it('should insert a single row', () => {
+      var result = generator.insert('test', {
+        'a': 1,
+        'b': 2
+      });
+
+      expect(result).toEqual('INSERT INTO test (a, b) VALUES (1, 2)');
+    });
+
+    it('should insert multiple rows', () => {
+      var result = generator.insert('test', [
+        {
+          'a': 1,
+          'b': 2
+        },
+        {
+          'a': 3,
+          'b': 4
+        }
+      ]);
+
+      expect(result).toEqual('INSERT INTO test (a, b) VALUES (1, 2), (3, 4)');
+    });
+  });
+
 });

@@ -84,6 +84,22 @@ class Generator {
 
     return select.toString();
   }
+
+  insert(tableName, attributes) {
+    if ((!_.isArray(attributes) && !_.isObject(attributes)) || !_.size(attributes)) {
+      throw 'Invalid param';
+    }
+
+    var insert = squel.insert().into(tableName);
+
+    if (_.isArray(attributes)) {
+      insert.setFieldsRows(attributes);
+    } else {
+      insert.setFields(attributes);
+    }
+
+    return insert.toString();
+  }
 }
 
 Generator.OPERATORS = OPERATORS;
