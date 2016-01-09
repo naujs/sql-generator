@@ -1,0 +1,30 @@
+{
+  "name": "@naujs/sql-generator",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/naujs/sql-generator.git"
+  },
+  "author": "Tan Nguyen",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/naujs/sql-generator/issues"
+  },
+  "homepage": "https://github.com/naujs/sql-generator#readme",
+  "devDependencies": {
+    "@naujs/gulp-tasks": "0.0.13"
+  },
+  "dependencies": {
+    "@naujs/db-criteria": "0.0.7",
+    "lodash": "^3.10.1",
+    "squel": "^4.2.2"
+  }
+}
