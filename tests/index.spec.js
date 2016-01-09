@@ -206,4 +206,22 @@ describe('SqlGenerator', () => {
       expect(result).toEqual('UPDATE test SET a = 1, b = GET_DATE()');
     });
   });
+
+  describe('#delete', () => {
+    it('should delete all rows', () => {
+      var result = generator.delete('test');
+
+      expect(result).toEqual('DELETE FROM test');
+    });
+
+    it('should delete rows using criteria', () => {
+      var criteria = new DbCriteria();
+      criteria.where('c', 1);
+      var result = generator.delete('test', criteria);
+
+      expect(result).toEqual('DELETE FROM test WHERE (c = 1)');
+    });
+
+  });
+
 });

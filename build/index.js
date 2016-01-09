@@ -161,6 +161,16 @@ var Generator = function () {
 
       return update.toString();
     }
+  }, {
+    key: 'delete',
+    value: function _delete(tableName, criteria) {
+      criteria = checkCriteria(criteria);
+
+      var del = squel.delete().from(tableName);
+      del = generateCriteria(del, criteria);
+
+      return del.toString();
+    }
   }]);
 
   return Generator;

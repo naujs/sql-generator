@@ -144,6 +144,15 @@ class Generator {
 
     return update.toString();
   }
+
+  delete(tableName, criteria) {
+    criteria = checkCriteria(criteria);
+
+    var del = squel.delete().from(tableName);
+    del = generateCriteria(del, criteria);
+
+    return del.toString();
+  }
 }
 
 Generator.OPERATORS = OPERATORS;
