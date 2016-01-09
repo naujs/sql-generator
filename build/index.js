@@ -31,6 +31,32 @@ var OPERATORS = {
   'nin': 'NOT IN'
 };
 
+function generateSelect(selectOrUpdate, criteria) {
+  selectOrUpdate = selectOrUpdate.where(generateWhereStatment(criteria.getWhere()));
+  var fields = criteria.getFields();
+  if (fields && fields.length) {
+    _.each(fields, function (field) {
+      selectOrUpdate = selectOrUpdate.field(field);
+    });
+  }
+
+  _.each(criteria.getOrder(), function (direction, key) {
+    selectOrUpdate = selectOrUpdate.order(key, direction);
+  });
+
+  // update doesnt have offset
+  if (selectOrUpdate.offset) {
+    selectOrUpdate = selectOrUpdate.offset(criteria.getOffset());
+  }
+
+  var limit = criteria.getLimit();
+  if (limit) {
+    selectOrUpdate = selectOrUpdate.limit(limit);
+  }
+
+  return selectOrUpdate;
+}
+
 function generateWhereStatment(where, expr) {
   if (!where || !where.length) {
     return '';
@@ -61,6 +87,25 @@ function generateWhereStatment(where, expr) {
   return expr;
 }
 
+function generateSet(insertOrUpdate, attributes) {
+  var noQuote = arguments.length <= 2 || arguments[2] === undefined ? [] : arguments[2];
+
+  // noQuote contains a list of attributes that should not be quoted.
+  // This is useful when using native functions as the value
+
+  _.each(attributes, function (v, k) {
+    var opts = {};
+
+    if (_.indexOf(noQuote, k) !== -1) {
+      opts.dontQuote = true;
+    }
+
+    insertOrUpdate = insertOrUpdate.set(k, v, opts);
+  });
+
+  return insertOrUpdate;
+}
+
 var Generator = function () {
   function Generator() {
     _classCallCheck(this, Generator);
@@ -71,24 +116,9 @@ var Generator = function () {
     value: function select(tableName, criteria) {
       criteria = checkCriteria(criteria);
 
-      var select = squel.select().from(tableName).where(generateWhereStatment(criteria.getWhere()));
+      var select = squel.select().from(tableName);
 
-      var fields = criteria.getFields();
-      if (fields && fields.length) {
-        _.each(fields, function (field) {
-          select = select.field(field);
-        });
-      }
-
-      _.each(criteria.getOrder(), function (direction, key) {
-        select = select.order(key, direction);
-      });
-
-      select = select.offset(criteria.getOffset());
-      var limit = criteria.getLimit();
-      if (limit) {
-        select = select.limit(limit);
-      }
+      select = generateSelect(select, criteria);
 
       return select.toString();
     }
@@ -101,10 +131,6 @@ var Generator = function () {
         throw 'Invalid param';
       }
 
-      // Contains a list of attributes that should not be quoted.
-      // This is useful when using native functions as the value
-      var noQuote = options.noQuote || [];
-
       var insert = squel.insert().into(tableName);
 
       if (_.isArray(attributes)) {
@@ -112,15 +138,7 @@ var Generator = function () {
         // when doing bulk insert
         insert.setFieldsRows(attributes);
       } else {
-        _.each(attributes, function (v, k) {
-          var opts = {};
-
-          if (_.indexOf(noQuote, k) !== -1) {
-            opts.dontQuote = true;
-          }
-
-          insert.set(k, v, opts);
-        });
+        insert = generateSet(insert, attributes, options.noQuote);
       }
 
       return insert.toString();
@@ -128,7 +146,19 @@ var Generator = function () {
   }, {
     key: 'update',
     value: function update(tableName, attributes, criteria) {
+      var options = arguments.length <= 3 || arguments[3] === undefined ? {} : arguments[3];
+
       criteria = checkCriteria(criteria);
+
+      if (!_.isObject(attributes) || !_.size(attributes)) {
+        throw 'Invalid param';
+      }
+
+      var update = squel.update().table(tableName);
+      update = generateSet(update, attributes, options.noQuote);
+      update = generateSelect(update, criteria);
+
+      return update.toString();
     }
   }]);
 
