@@ -20,7 +20,7 @@
   },
   "homepage": "https://github.com/naujs/sql-generator#readme",
   "devDependencies": {
-    "@naujs/gulp-tasks": "0.0.13"
+    "@naujs/gulp-tasks": "0.1.0"
   },
   "dependencies": {
     "@naujs/db-criteria": "0.0.7",
