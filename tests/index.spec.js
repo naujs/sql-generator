@@ -49,6 +49,30 @@ describe('SqlGenerator', () => {
       expect(result).toEqual('SELECT * FROM test WHERE (a = 1 AND b = 2 OR c = 3 OR (d = 3 AND e = 4))');
     });
 
+    it('should support multiple conditions for the same field', () => {
+      var criteria = new DbCriteria();
+      criteria.where('a', 1);
+      criteria.where('a', 2);
+      var result = generator.select('test', criteria);
+      expect(result).toEqual('SELECT * FROM test WHERE (a = 1 AND a = 2)');
+
+      criteria = new DbCriteria();
+      criteria.where('a', [
+        criteria.gte(10),
+        criteria.lte(100)
+      ]);
+      result = generator.select('test', criteria);
+      expect(result).toEqual('SELECT * FROM test WHERE (a >= 10 AND a <= 100)');
+
+      criteria = new DbCriteria();
+      criteria.where('a', [
+        criteria.lte(10),
+        criteria.gte(100)
+      ], true);
+      result = generator.select('test', criteria);
+      expect(result).toEqual('SELECT * FROM test WHERE (a <= 10 OR a >= 100)');
+    });
+
     it('should process IN', () => {
       var criteria = new DbCriteria();
       criteria.where('a', criteria.in([1, 2, 3]));
