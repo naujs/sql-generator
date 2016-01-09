@@ -31,30 +31,31 @@ var OPERATORS = {
   'nin': 'NOT IN'
 };
 
-function generateSelect(selectOrUpdate, criteria) {
-  selectOrUpdate = selectOrUpdate.where(generateWhereStatment(criteria.getWhere()));
+function generateCriteria(stm, criteria) {
+  // stm can be select, update or delete query
+  stm = stm.where(generateWhereStatment(criteria.getWhere()));
   var fields = criteria.getFields();
   if (fields && fields.length) {
     _.each(fields, function (field) {
-      selectOrUpdate = selectOrUpdate.field(field);
+      stm = stm.field(field);
     });
   }
 
   _.each(criteria.getOrder(), function (direction, key) {
-    selectOrUpdate = selectOrUpdate.order(key, direction);
+    stm = stm.order(key, direction);
   });
 
   // update doesnt have offset
-  if (selectOrUpdate.offset) {
-    selectOrUpdate = selectOrUpdate.offset(criteria.getOffset());
+  if (stm.offset) {
+    stm = stm.offset(criteria.getOffset());
   }
 
   var limit = criteria.getLimit();
   if (limit) {
-    selectOrUpdate = selectOrUpdate.limit(limit);
+    stm = stm.limit(limit);
   }
 
-  return selectOrUpdate;
+  return stm;
 }
 
 function generateWhereStatment(where, expr) {
@@ -118,7 +119,7 @@ var Generator = function () {
 
       var select = squel.select().from(tableName);
 
-      select = generateSelect(select, criteria);
+      select = generateCriteria(select, criteria);
 
       return select.toString();
     }
@@ -156,7 +157,7 @@ var Generator = function () {
 
       var update = squel.update().table(tableName);
       update = generateSet(update, attributes, options.noQuote);
-      update = generateSelect(update, criteria);
+      update = generateCriteria(update, criteria);
 
       return update.toString();
     }
