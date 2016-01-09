@@ -85,20 +85,38 @@ class Generator {
     return select.toString();
   }
 
-  insert(tableName, attributes) {
+  insert(tableName, attributes, options = {}) {
     if ((!_.isArray(attributes) && !_.isObject(attributes)) || !_.size(attributes)) {
       throw 'Invalid param';
     }
 
+    // Contains a list of attributes that should not be quoted.
+    // This is useful when using native functions as the value
+    var noQuote = options.noQuote || [];
+
     var insert = squel.insert().into(tableName);
 
     if (_.isArray(attributes)) {
+      // Unfortunately, it is not possible to use native functions
+      // when doing bulk insert
       insert.setFieldsRows(attributes);
     } else {
-      insert.setFields(attributes);
+      _.each(attributes, (v, k) => {
+        let opts = {};
+
+        if (_.indexOf(noQuote, k) !== -1) {
+          opts.dontQuote = true;
+        }
+
+        insert.set(k, v, opts);
+      });
     }
 
     return insert.toString();
+  }
+
+  update(tableName, attributes, criteria) {
+    criteria = checkCriteria(criteria);
   }
 }
 

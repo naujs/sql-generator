@@ -146,6 +146,17 @@ describe('SqlGenerator', () => {
       expect(result).toEqual('INSERT INTO test (a, b) VALUES (1, 2)');
     });
 
+    it('should insert a single row using noQuote option', () => {
+      var result = generator.insert('test', {
+        'a': 1,
+        'b': 'GET_DATE()'
+      }, {
+        noQuote: ['b']
+      });
+
+      expect(result).toEqual('INSERT INTO test (a, b) VALUES (1, GET_DATE())');
+    });
+
     it('should insert multiple rows', () => {
       var result = generator.insert('test', [
         {
