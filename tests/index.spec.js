@@ -49,7 +49,7 @@ describe('SqlGenerator', () => {
       expect(result).toEqual('SELECT * FROM test WHERE (a = 1 AND b = 2 OR c = 3 OR (d = 3 AND e = 4))');
     });
 
-    fit('should process complex conditions passed to DbCriteria constructor', () => {
+    it('should process complex conditions passed to DbCriteria constructor', () => {
       var criteria = new DbCriteria({
         where: {
           and: {
