@@ -224,4 +224,21 @@ describe('SqlGenerator', () => {
 
   });
 
+  describe('psql engine', () => {
+    beforeEach(() => {
+      generator = new SqlGenerator(SqlGenerator.PSQL);
+    });
+
+    describe('#insert', () => {
+      it('should return all fields after inserting', () => {
+        var result = generator.insert('test', {
+          'a': 1,
+          'b': 2
+        });
+
+        expect(result).toEqual('INSERT INTO test (a, b) VALUES (1, 2) RETURNING *');
+      });
+    });
+  });
+
 });

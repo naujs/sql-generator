@@ -20,6 +20,8 @@ function checkCriteria(criteria) {
   throw 'Invalid criteria';
 }
 
+var PSQL = 'psql';
+
 var OPERATORS = {
   'eq': '=',
   'neq': '<>',
@@ -107,9 +109,38 @@ function generateSet(insertOrUpdate, attributes) {
   return insertOrUpdate;
 }
 
+function initSquelForSpecificEngine(engine) {
+  if (!engine) {
+    return squel;
+  }
+
+  switch (engine) {
+    case PSQL:
+      return squel.useFlavour('postgres');
+    default:
+      return squel;
+  }
+}
+
+function processEngineSpecificInsertQuery(insert, engine) {
+  if (!engine) {
+    return insert;
+  }
+
+  switch (engine) {
+    case PSQL:
+      return insert.returning('*');
+    default:
+      return insert;
+  }
+}
+
 var Generator = function () {
-  function Generator() {
+  function Generator(engine) {
     _classCallCheck(this, Generator);
+
+    this._engine = engine ? engine.toLowerCase() : null;
+    this._squel = initSquelForSpecificEngine(this._engine);
   }
 
   _createClass(Generator, [{
@@ -117,7 +148,7 @@ var Generator = function () {
     value: function select(tableName, criteria) {
       criteria = checkCriteria(criteria);
 
-      var select = squel.select().from(tableName);
+      var select = this._squel.select().from(tableName);
 
       select = generateCriteria(select, criteria);
 
@@ -132,7 +163,7 @@ var Generator = function () {
         throw 'Invalid param';
       }
 
-      var insert = squel.insert().into(tableName);
+      var insert = this._squel.insert().into(tableName);
 
       if (_.isArray(attributes)) {
         // Unfortunately, it is not possible to use native functions
@@ -141,6 +172,8 @@ var Generator = function () {
       } else {
         insert = generateSet(insert, attributes, options.noQuote);
       }
+
+      insert = processEngineSpecificInsertQuery(insert, this._engine);
 
       return insert.toString();
     }
@@ -155,7 +188,7 @@ var Generator = function () {
         throw 'Invalid param';
       }
 
-      var update = squel.update().table(tableName);
+      var update = this._squel.update().table(tableName);
       update = generateSet(update, attributes, options.noQuote);
       update = generateCriteria(update, criteria);
 
@@ -166,7 +199,7 @@ var Generator = function () {
     value: function _delete(tableName, criteria) {
       criteria = checkCriteria(criteria);
 
-      var del = squel.delete().from(tableName);
+      var del = this._squel.delete().from(tableName);
       del = generateCriteria(del, criteria);
 
       return del.toString();
@@ -177,5 +210,6 @@ var Generator = function () {
 }();
 
 Generator.OPERATORS = OPERATORS;
+Generator.PSQL = PSQL;
 
 module.exports = Generator;
