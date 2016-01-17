@@ -23,7 +23,7 @@
     "@naujs/gulp-tasks": "^0.1.1"
   },
   "dependencies": {
-    "@naujs/db-criteria": "0.0.9",
+    "@naujs/db-criteria": "^0.1.1",
     "lodash": "^3.10.1",
     "squel": "^4.2.2"
   }

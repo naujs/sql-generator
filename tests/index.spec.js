@@ -49,6 +49,44 @@ describe('SqlGenerator', () => {
       expect(result).toEqual('SELECT * FROM test WHERE (a = 1 AND b = 2 OR c = 3 OR (d = 3 AND e = 4))');
     });
 
+    fit('should process complex conditions passed to DbCriteria constructor', () => {
+      var criteria = new DbCriteria({
+        where: {
+          and: {
+            or: {
+              a: 1,
+              b: 2
+            },
+            c: 3
+          }
+        }
+      });
+
+      var result = generator.select('test', criteria);
+      expect(result).toEqual('SELECT * FROM test WHERE (((a = 1 OR b = 2) AND c = 3))');
+
+      criteria = new DbCriteria({
+        where: {
+          a: 1,
+          b: 2,
+          or: {
+            c: 3,
+            d: 4,
+            and: {
+              e: 5,
+              f: 6,
+              or: {
+                g: 7,
+                h: 8
+              }
+            }
+          }
+        }
+      });
+      result = generator.select('test', criteria);
+      expect(result).toEqual('SELECT * FROM test WHERE (a = 1 AND b = 2 AND (c = 3 OR d = 4 OR (e = 5 AND f = 6 AND (g = 7 OR h = 8))))');
+    });
+
     it('should support multiple conditions for the same field', () => {
       var criteria = new DbCriteria();
       criteria.where('a', 1);
