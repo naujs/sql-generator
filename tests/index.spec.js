@@ -235,7 +235,9 @@ describe('SqlGenerator', () => {
 
     it('should update a row using object as criteria', () => {
       var result = generator.update('test', {
-        'c': 1
+        where: {
+          'c': 1
+        }
       }, {
         'a': 1,
         'b': 2
@@ -292,7 +294,9 @@ describe('SqlGenerator', () => {
     describe('#update', () => {
       it('should return all fields after updating', () => {
         var result = generator.update('test', {
-          'c': 1
+          where: {
+            'c': 1
+          }
         }, {
           'a': 1,
           'b': 2

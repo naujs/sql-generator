@@ -8,7 +8,7 @@ function checkCriteria(criteria) {
   if (criteria instanceof DbCriteria) {
     return criteria;
   } else if (_.isObject(criteria)) {
-    return new DbCriteria({where: criteria});
+    return new DbCriteria(criteria);
   } else if (criteria === void(0) || criteria === null) {
     return new DbCriteria();
   }
