@@ -144,6 +144,19 @@ function processEngineSpecificUpdateQuery(update, engine) {
   }
 }
 
+function processEngineSpecificDeleteQuery(del, engine) {
+  if (!engine) {
+    return del;
+  }
+
+  switch(engine) {
+    case PSQL:
+      return del.returning('*');
+    default:
+      return del;
+  }
+}
+
 class Generator {
   constructor(engine) {
     this._engine = engine ? engine.toLowerCase() : null;
@@ -201,6 +214,8 @@ class Generator {
 
     var del = this._squel.delete().from(tableName);
     del = generateCriteria(del, criteria);
+
+    del = processEngineSpecificDeleteQuery(del, this._engine);
 
     return del.toString();
   }

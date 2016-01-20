@@ -305,6 +305,17 @@ describe('SqlGenerator', () => {
         expect(result).toEqual('UPDATE test SET a = 1, b = 2 WHERE (c = 1) RETURNING *');
       });
     });
+
+    describe('#delete', () => {
+      it('should return all fields after deleting', () => {
+        var criteria = new DbCriteria();
+        criteria.where('c', 1);
+        var result = generator.delete('test', criteria);
+
+        expect(result).toEqual('DELETE FROM test WHERE (c = 1) RETURNING *');
+      });
+
+    });
   });
 
 });
