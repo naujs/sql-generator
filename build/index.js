@@ -12,7 +12,7 @@ function checkCriteria(criteria) {
   if (criteria instanceof DbCriteria) {
     return criteria;
   } else if (_.isObject(criteria)) {
-    return new DbCriteria(criteria);
+    return new DbCriteria({ where: criteria });
   } else if (criteria === void 0 || criteria === null) {
     return new DbCriteria();
   }
@@ -35,7 +35,9 @@ var OPERATORS = {
 
 function generateCriteria(stm, criteria) {
   // stm can be select, update or delete query
-  stm = stm.where(generateWhereStatment(criteria.getWhere()));
+  var where = generateWhereStatment(criteria.getWhere());
+  stm = stm.where(where.toString());
+
   var fields = criteria.getFields();
   if (fields && fields.length) {
     _.each(fields, function (field) {
@@ -135,6 +137,19 @@ function processEngineSpecificInsertQuery(insert, engine) {
   }
 }
 
+function processEngineSpecificUpdateQuery(update, engine) {
+  if (!engine) {
+    return update;
+  }
+
+  switch (engine) {
+    case PSQL:
+      return update.returning('*');
+    default:
+      return update;
+  }
+}
+
 var Generator = function () {
   function Generator(engine) {
     _classCallCheck(this, Generator);
@@ -183,7 +198,6 @@ var Generator = function () {
       var options = arguments.length <= 3 || arguments[3] === undefined ? {} : arguments[3];
 
       criteria = checkCriteria(criteria);
-
       if (!_.isObject(attributes) || !_.size(attributes)) {
         throw 'Invalid param';
       }
@@ -191,6 +205,8 @@ var Generator = function () {
       var update = this._squel.update().table(tableName);
       update = generateSet(update, attributes, options.noQuote);
       update = generateCriteria(update, criteria);
+
+      update = processEngineSpecificUpdateQuery(update, this._engine);
 
       return update.toString();
     }

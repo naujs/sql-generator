@@ -233,6 +233,17 @@ describe('SqlGenerator', () => {
       expect(result).toEqual('UPDATE test SET a = 1, b = 2 WHERE (c = 1)');
     });
 
+    it('should update a row using object as criteria', () => {
+      var result = generator.update('test', {
+        'c': 1
+      }, {
+        'a': 1,
+        'b': 2
+      });
+
+      expect(result).toEqual('UPDATE test SET a = 1, b = 2 WHERE (c = 1)');
+    });
+
     it('should update a row using noQuote', () => {
       var result = generator.update('test', null, {
         'a': 1,
@@ -275,6 +286,19 @@ describe('SqlGenerator', () => {
         });
 
         expect(result).toEqual('INSERT INTO test (a, b) VALUES (1, 2) RETURNING *');
+      });
+    });
+
+    describe('#update', () => {
+      it('should return all fields after updating', () => {
+        var result = generator.update('test', {
+          'c': 1
+        }, {
+          'a': 1,
+          'b': 2
+        });
+
+        expect(result).toEqual('UPDATE test SET a = 1, b = 2 WHERE (c = 1) RETURNING *');
       });
     });
   });
