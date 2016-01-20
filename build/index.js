@@ -179,7 +179,7 @@ var Generator = function () {
     }
   }, {
     key: 'update',
-    value: function update(tableName, attributes, criteria) {
+    value: function update(tableName, criteria, attributes) {
       var options = arguments.length <= 3 || arguments[3] === undefined ? {} : arguments[3];
 
       criteria = checkCriteria(criteria);

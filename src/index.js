@@ -166,7 +166,7 @@ class Generator {
     return insert.toString();
   }
 
-  update(tableName, attributes, criteria, options = {}) {
+  update(tableName, criteria, attributes, options = {}) {
     criteria = checkCriteria(criteria);
 
     if (!_.isObject(attributes) || !_.size(attributes)) {

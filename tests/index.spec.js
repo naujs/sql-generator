@@ -213,7 +213,7 @@ describe('SqlGenerator', () => {
 
   describe('#update', () => {
     it('should update a row', () => {
-      var result = generator.update('test', {
+      var result = generator.update('test', {}, {
         'a': 1,
         'b': 2
       });
@@ -225,19 +225,19 @@ describe('SqlGenerator', () => {
       var criteria = new DbCriteria();
       criteria.where('c', 1);
 
-      var result = generator.update('test', {
+      var result = generator.update('test', criteria, {
         'a': 1,
         'b': 2
-      }, criteria);
+      });
 
       expect(result).toEqual('UPDATE test SET a = 1, b = 2 WHERE (c = 1)');
     });
 
     it('should update a row using noQuote', () => {
-      var result = generator.update('test', {
+      var result = generator.update('test', null, {
         'a': 1,
         'b': 'GET_DATE()'
-      }, null, {
+      }, {
         noQuote: 'b'
       });
 
