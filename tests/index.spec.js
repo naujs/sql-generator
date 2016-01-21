@@ -275,6 +275,23 @@ describe('SqlGenerator', () => {
 
   });
 
+  describe('#count', () => {
+    it('should count all rows', () => {
+      var result = generator.count('test');
+
+      expect(result).toEqual('SELECT COUNT(*) FROM test');
+    });
+
+    it('should count rows using criteria', () => {
+      var criteria = new DbCriteria();
+      criteria.where('c', 1);
+      var result = generator.count('test', criteria);
+
+      expect(result).toEqual('SELECT COUNT(*) FROM test WHERE (c = 1)');
+    });
+
+  });
+
   describe('psql engine', () => {
     beforeEach(() => {
       generator = new SqlGenerator(SqlGenerator.PSQL);

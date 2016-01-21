@@ -219,6 +219,18 @@ class Generator {
 
     return del.toString();
   }
+
+  count(tableName, criteria) {
+    criteria = checkCriteria(criteria);
+    var where = generateWhereStatment(criteria.getWhere());
+
+    var select = this._squel.select()
+                            .from(tableName)
+                            .field('COUNT(*)')
+                            .where(where.toString());
+
+    return select.toString();
+  }
 }
 
 Generator.OPERATORS = OPERATORS;
