@@ -87,6 +87,70 @@ describe('SqlGenerator', () => {
       expect(result).toEqual('SELECT * FROM test WHERE (a = 1 AND b = 2 AND (c = 3 OR d = 4 OR (e = 5 AND f = 6 AND (g = 7 OR h = 8))))');
     });
 
+    it('should support multiple or conditions for the same field passed to DbCriteria constructor', () => {
+      criteria = new DbCriteria({
+        where: {
+          or: [
+            {a: 0},
+            {a: {gt: 2}}
+          ]
+        }
+      });
+      result = generator.select('test', criteria);
+      expect(result).toEqual('SELECT * FROM test WHERE ((a = 0 OR a > 2))');
+    });
+
+    it('should support multiple and conditions for the same field passed to DbCriteria constructor', () => {
+      criteria = new DbCriteria({
+        where: {
+          and: [
+            {a: 0},
+            {a: {gt: 2}}
+          ]
+        }
+      });
+      result = generator.select('test', criteria);
+      expect(result).toEqual('SELECT * FROM test WHERE ((a = 0 AND a > 2))');
+    });
+
+    it('should support multiple nested conditions for the same field passed to DbCriteria constructor', () => {
+      criteria = new DbCriteria({
+        where: {
+          and: {
+            or: [
+              {a: 0},
+              {a: {gt: 2}}
+            ],
+            b: 1
+          }
+        }
+      });
+      result = generator.select('test', criteria);
+      expect(result).toEqual('SELECT * FROM test WHERE (((a = 0 OR a > 2) AND b = 1))');
+    });
+
+    it('should support multiple insanely nested conditions for the same field passed to DbCriteria constructor', () => {
+      criteria = new DbCriteria({
+        where: {
+          and: {
+            or: [
+              {a: 0},
+              {a: {gt: 2}},
+              {
+                and: [
+                  {e: 2},
+                  {f: {lt: 3}}
+                ]
+              }
+            ],
+            b: 1
+          }
+        }
+      });
+      result = generator.select('test', criteria);
+      expect(result).toEqual('SELECT * FROM test WHERE (((a = 0 OR a > 2 OR (e = 2 AND f < 3)) AND b = 1))');
+    });
+
     it('should support multiple conditions for the same field', () => {
       var criteria = new DbCriteria();
       criteria.where('a', 1);
