@@ -92,6 +92,10 @@ function generateWhereStatment(where, expr) {
   return expr;
 }
 
+function generateJoin(select, criteria, meta) {
+  var include = criteria.getInclude();
+}
+
 function generateSet(insertOrUpdate, attributes) {
   var noQuote = arguments.length <= 2 || arguments[2] === undefined ? [] : arguments[2];
 
@@ -173,10 +177,12 @@ var Generator = (function () {
 
   _createClass(Generator, [{
     key: 'select',
-    value: function select(tableName, criteria) {
-      criteria = checkCriteria(criteria);
+    value: function select(filter, meta) {
+      var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
 
-      var select = this._squel.select().from(tableName);
+      var criteria = checkCriteria(filter);
+
+      var select = this._squel.select().from(meta.modelName);
 
       select = generateCriteria(select, criteria);
 
@@ -184,14 +190,14 @@ var Generator = (function () {
     }
   }, {
     key: 'insert',
-    value: function insert(tableName, attributes) {
+    value: function insert(attributes, meta) {
       var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
 
       if (!_.isArray(attributes) && !_.isObject(attributes) || !_.size(attributes)) {
         throw 'Invalid param';
       }
 
-      var insert = this._squel.insert().into(tableName);
+      var insert = this._squel.insert().into(meta.modelName);
 
       if (_.isArray(attributes)) {
         // Unfortunately, it is not possible to use native functions
@@ -207,15 +213,15 @@ var Generator = (function () {
     }
   }, {
     key: 'update',
-    value: function update(tableName, criteria, attributes) {
+    value: function update(filter, attributes, meta) {
       var options = arguments.length <= 3 || arguments[3] === undefined ? {} : arguments[3];
 
-      criteria = checkCriteria(criteria);
+      var criteria = checkCriteria(filter);
       if (!_.isObject(attributes) || !_.size(attributes)) {
         throw 'Invalid param';
       }
 
-      var update = this._squel.update().table(tableName);
+      var update = this._squel.update().table(meta.modelName);
       update = generateSet(update, attributes, options.noQuote);
       update = generateCriteria(update, criteria);
 
@@ -225,10 +231,12 @@ var Generator = (function () {
     }
   }, {
     key: 'delete',
-    value: function _delete(tableName, criteria) {
-      criteria = checkCriteria(criteria);
+    value: function _delete(filter, meta) {
+      var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
 
-      var del = this._squel.delete().from(tableName);
+      var criteria = checkCriteria(filter);
+
+      var del = this._squel.delete().from(meta.modelName);
       del = generateCriteria(del, criteria);
 
       del = processEngineSpecificDeleteQuery(del, this._engine);
@@ -237,11 +245,13 @@ var Generator = (function () {
     }
   }, {
     key: 'count',
-    value: function count(tableName, criteria) {
-      criteria = checkCriteria(criteria);
+    value: function count(filter, meta) {
+      var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
+
+      var criteria = checkCriteria(filter);
       var where = generateWhereStatment(criteria.getWhere());
 
-      var select = this._squel.select().from(tableName).field('COUNT(*)').where(where.toString());
+      var select = this._squel.select().from(meta.modelName).field('COUNT(' + meta.primaryKey + ')').where(where.toString());
 
       return select.toString();
     }
