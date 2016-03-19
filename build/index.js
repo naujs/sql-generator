@@ -2,6 +2,8 @@
 
 var _createClass = (function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; })();
 
+function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
+
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 var DbCriteria = require('@naujs/db-criteria'),
@@ -33,15 +35,30 @@ var OPERATORS = {
   'nin': 'NOT IN'
 };
 
-function generateCriteria(stm, criteria) {
-  // stm can be select, update or delete query
-  var where = generateWhereStatment(criteria.getWhere());
+function getAllPropertiesFromMeta(meta) {
+  var properties = _.chain(meta.properties).clone().keys().value();
+  properties.push(meta.primaryKey);
+  var foreignKeys = _.chain(meta.relations).map(function (relation) {
+    // TODO: use constants here
+    if (relation.type == 'belongsTo') {
+      return relation.foreignKey;
+    }
+    return null;
+  }).compact().value();
+  return _.union(properties, foreignKeys);
+}
+
+function generateCriteria(type, stm, criteria, meta) {
+  // type can be `select`, `update` or `delete`
+  var where = generateWhereStatment(criteria.getWhere(), type == 'select' ? meta.modelName : null);
   stm = stm.where(where.toString());
+  var tableName = meta.modelName;
 
   var fields = criteria.getFields();
-  if (fields && fields.length) {
+  if (fields && fields.length && type == 'select') {
     _.each(fields, function (field) {
-      stm = stm.field(field);
+      var name = tableName + '.' + field;
+      stm = stm.field(name, name);
     });
   }
 
@@ -62,7 +79,7 @@ function generateCriteria(stm, criteria) {
   return stm;
 }
 
-function generateWhereStatment(where, expr) {
+function generateWhereStatment(where, alias, expr) {
   if (!where || !where.length) {
     return '';
   }
@@ -77,10 +94,14 @@ function generateWhereStatment(where, expr) {
         expr = expr.and_begin();
       }
 
-      expr = generateWhereStatment(condition.where, expr);
+      expr = generateWhereStatment(condition.where, alias, expr);
       expr = expr.end();
     } else {
-      var stm = [condition.key, OPERATORS[condition.operator], '?'].join(' ');
+      var key = condition.key;
+      if (alias) {
+        key = alias + '.' + condition.key;
+      }
+      var stm = [key, OPERATORS[condition.operator], '?'].join(' ');
       if (condition.or) {
         expr = expr.or(stm, condition.value);
       } else {
@@ -90,10 +111,6 @@ function generateWhereStatment(where, expr) {
   });
 
   return expr;
-}
-
-function generateJoin(select, criteria, meta) {
-  var include = criteria.getInclude();
 }
 
 function generateSet(insertOrUpdate, attributes) {
@@ -167,6 +184,10 @@ function processEngineSpecificDeleteQuery(del, engine) {
   }
 }
 
+function processEngineSpecificJoinQuery(select, engine, include, meta) {
+  return select;
+}
+
 var Generator = (function () {
   function Generator(engine) {
     _classCallCheck(this, Generator);
@@ -184,7 +205,19 @@ var Generator = (function () {
 
       var select = this._squel.select().from(meta.modelName);
 
-      select = generateCriteria(select, criteria);
+      // always explicitly specify fields
+      var fields = criteria.getFields();
+      if (!fields || !fields.length) {
+        var properties = getAllPropertiesFromMeta(meta);
+        criteria.fields.apply(criteria, _toConsumableArray(properties));
+      }
+
+      select = generateCriteria('select', select, criteria, meta);
+
+      var include = criteria.getInclude();
+      if (include && include.length) {
+        select = processEngineSpecificJoinQuery(select, this._engine, include, meta);
+      }
 
       return select.toString();
     }
@@ -223,7 +256,7 @@ var Generator = (function () {
 
       var update = this._squel.update().table(meta.modelName);
       update = generateSet(update, attributes, options.noQuote);
-      update = generateCriteria(update, criteria);
+      update = generateCriteria('update', update, criteria, meta);
 
       update = processEngineSpecificUpdateQuery(update, this._engine);
 
@@ -237,7 +270,7 @@ var Generator = (function () {
       var criteria = checkCriteria(filter);
 
       var del = this._squel.delete().from(meta.modelName);
-      del = generateCriteria(del, criteria);
+      del = generateCriteria('delete', del, criteria, meta);
 
       del = processEngineSpecificDeleteQuery(del, this._engine);
 
