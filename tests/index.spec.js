@@ -37,41 +37,6 @@ Product.relations = {
 Registry.setModel(Store);
 Registry.setModel(Product);
 
-const meta = {
-  'primaryKey': 'id',
-  'primaryKeyType': 'number',
-  'properties': {
-    'firstName': {
-      'type': 'string'
-    },
-    'lastName': {
-      'type': 'string'
-    },
-    'name': {
-      'type': 'string',
-      'persistable': false
-    }
-  },
-  'modelName': 'dummy',
-  'pluralName': 'dummies',
-  'relations': {
-    'dummies': {
-      'model': 'AnotherDummy',
-      'type': 'hasMany',
-      'foreignKey': 'dummyId',
-      'referenceKey': 'id',
-      'meta': {
-        'primaryKey': 'id',
-        'primaryKeyType': 'number',
-        'properties': { 'age': { 'type': 'number' } },
-        'modelName': 'anotherDummy',
-        'pluralName': 'anotherDummies',
-        'relations': {}
-      }
-    }
-  }
-};
-
 describe('SqlGenerator', () => {
   var generator, criteria;
 
@@ -146,7 +111,7 @@ describe('SqlGenerator', () => {
           }
         }
       });
-      result = generator.select(criteria, meta);
+      result = generator.select(criteria);
       expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a = 1 AND Store.b = 2 AND (Store.c = 3 OR Store.d = 4 OR (Store.e = 5 AND Store.f = 6 AND (Store.g = 7 OR Store.h = 8))))');
     });
 
@@ -172,7 +137,7 @@ describe('SqlGenerator', () => {
           ]
         }
       });
-      var result = generator.select(criteria, meta);
+      var result = generator.select(criteria);
       expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE ((Store.a = 0 AND Store.a > 2))');
     });
 
@@ -188,7 +153,7 @@ describe('SqlGenerator', () => {
           }
         }
       });
-      var result = generator.select(criteria, meta);
+      var result = generator.select(criteria);
       expect(result).toEqual('SELECT Product.name AS "Product.name", Product.id AS "Product.id", Product.store_id AS "Product.store_id" FROM Product WHERE (((Product.a = 0 OR Product.a > 2) AND Product.b = 1))');
     });
 
@@ -210,7 +175,7 @@ describe('SqlGenerator', () => {
           }
         }
       });
-      var result = generator.select(criteria, meta);
+      var result = generator.select(criteria);
       expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (((Store.a = 0 OR Store.a > 2 OR (Store.e = 2 AND Store.f < 3)) AND Store.b = 1))');
     });
 
@@ -395,7 +360,7 @@ describe('SqlGenerator', () => {
 
     it('should count rows using criteria', () => {
       criteria.where('c', 1);
-      var result = generator.count(criteria, meta);
+      var result = generator.count(criteria);
 
       expect(result).toEqual('SELECT COUNT(id) FROM Store WHERE (c = 1)');
     });
