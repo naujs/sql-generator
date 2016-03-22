@@ -1,6 +1,41 @@
+'use strict';
+
 var SqlGenerator = require('../')
   , DbCriteria = require('@naujs/db-criteria')
-  , _ = require('lodash');
+  , _ = require('lodash')
+  , Registry = require('@naujs/registry')
+  , ActiveRecord = require('@naujs/active-record');
+
+class Store extends ActiveRecord {}
+Store.properties = {
+  name: {
+    type: ActiveRecord.Types.string
+  }
+};
+Store.relations = {
+  products: {
+    type: 'hasMany',
+    model: 'Product',
+    foreignKey: 'store_id'
+  }
+};
+
+class Product extends ActiveRecord {}
+Product.properties = {
+  name: {
+    type: ActiveRecord.Types.string
+  }
+};
+Product.relations = {
+  store: {
+    type: 'belongsTo',
+    model: 'Store',
+    foreignKey: 'store_id'
+  }
+};
+
+Registry.setModel(Store);
+Registry.setModel(Product);
 
 const meta = {
   'primaryKey': 'id',
@@ -38,40 +73,33 @@ const meta = {
 };
 
 describe('SqlGenerator', () => {
-  var generator;
+  var generator, criteria;
 
   beforeEach(() => {
     generator = new SqlGenerator();
+    criteria = new DbCriteria(Store);
   });
 
   describe('#select', () => {
     it('should return select statement', () => {
-      var criteria = new DbCriteria();
       criteria.where('a', 1);
       criteria.where('b', 2);
 
-      var result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy WHERE (dummy.a = 1 AND dummy.b = 2)');
-    });
-
-    it('should return select statement even if there is no criteria provided', () => {
-      var result = generator.select({}, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy');
+      var result = generator.select(criteria);
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a = 1 AND Store.b = 2)');
     });
 
     it('should process OR', () => {
-      var criteria = new DbCriteria();
       criteria.where('a', 1);
       criteria.where('b', 2);
       criteria.where('c', 3, true);
 
-      var result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy WHERE (dummy.a = 1 AND dummy.b = 2 OR dummy.c = 3)');
+      var result = generator.select(criteria);
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a = 1 AND Store.b = 2 OR Store.c = 3)');
     });
 
     it('should process nested DbCriteria query', () => {
-      var criteria = new DbCriteria();
-      var nestedCriteria = new DbCriteria();
+      var nestedCriteria = new DbCriteria(Store);
       nestedCriteria.where('d', 3);
       nestedCriteria.where('e', 4);
 
@@ -80,12 +108,12 @@ describe('SqlGenerator', () => {
       criteria.where('c', 3, true);
       criteria.where(nestedCriteria, true);
 
-      var result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy WHERE (dummy.a = 1 AND dummy.b = 2 OR dummy.c = 3 OR (dummy.d = 3 AND dummy.e = 4))');
+      var result = generator.select(criteria);
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a = 1 AND Store.b = 2 OR Store.c = 3 OR (Store.d = 3 AND Store.e = 4))');
     });
 
     it('should process complex conditions passed to DbCriteria constructor', () => {
-      var criteria = new DbCriteria({
+      criteria = new DbCriteria(Store, {
         where: {
           and: {
             or: {
@@ -97,10 +125,10 @@ describe('SqlGenerator', () => {
         }
       });
 
-      var result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy WHERE (((dummy.a = 1 OR dummy.b = 2) AND dummy.c = 3))');
+      var result = generator.select(criteria);
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (((Store.a = 1 OR Store.b = 2) AND Store.c = 3))');
 
-      criteria = new DbCriteria({
+      criteria = new DbCriteria(Store, {
         where: {
           a: 1,
           b: 2,
@@ -119,11 +147,11 @@ describe('SqlGenerator', () => {
         }
       });
       result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy WHERE (dummy.a = 1 AND dummy.b = 2 AND (dummy.c = 3 OR dummy.d = 4 OR (dummy.e = 5 AND dummy.f = 6 AND (dummy.g = 7 OR dummy.h = 8))))');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a = 1 AND Store.b = 2 AND (Store.c = 3 OR Store.d = 4 OR (Store.e = 5 AND Store.f = 6 AND (Store.g = 7 OR Store.h = 8))))');
     });
 
     it('should support multiple or conditions for the same field passed to DbCriteria constructor', () => {
-      criteria = new DbCriteria({
+      criteria = new DbCriteria(Store, {
         where: {
           or: [
             {a: 0},
@@ -131,12 +159,12 @@ describe('SqlGenerator', () => {
           ]
         }
       });
-      result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy WHERE ((dummy.a = 0 OR dummy.a > 2))');
+      var result = generator.select(criteria);
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE ((Store.a = 0 OR Store.a > 2))');
     });
 
     it('should support multiple and conditions for the same field passed to DbCriteria constructor', () => {
-      criteria = new DbCriteria({
+      criteria = new DbCriteria(Store, {
         where: {
           and: [
             {a: 0},
@@ -144,12 +172,12 @@ describe('SqlGenerator', () => {
           ]
         }
       });
-      result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy WHERE ((dummy.a = 0 AND dummy.a > 2))');
+      var result = generator.select(criteria, meta);
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE ((Store.a = 0 AND Store.a > 2))');
     });
 
     it('should support multiple nested conditions for the same field passed to DbCriteria constructor', () => {
-      criteria = new DbCriteria({
+      criteria = new DbCriteria(Product, {
         where: {
           and: {
             or: [
@@ -160,12 +188,12 @@ describe('SqlGenerator', () => {
           }
         }
       });
-      result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy WHERE (((dummy.a = 0 OR dummy.a > 2) AND dummy.b = 1))');
+      var result = generator.select(criteria, meta);
+      expect(result).toEqual('SELECT Product.name AS "Product.name", Product.id AS "Product.id", Product.store_id AS "Product.store_id" FROM Product WHERE (((Product.a = 0 OR Product.a > 2) AND Product.b = 1))');
     });
 
     it('should support multiple insanely nested conditions for the same field passed to DbCriteria constructor', () => {
-      criteria = new DbCriteria({
+      criteria = new DbCriteria(Store, {
         where: {
           and: {
             or: [
@@ -182,211 +210,194 @@ describe('SqlGenerator', () => {
           }
         }
       });
-      result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy WHERE (((dummy.a = 0 OR dummy.a > 2 OR (dummy.e = 2 AND dummy.f < 3)) AND dummy.b = 1))');
+      var result = generator.select(criteria, meta);
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (((Store.a = 0 OR Store.a > 2 OR (Store.e = 2 AND Store.f < 3)) AND Store.b = 1))');
     });
 
     it('should support multiple conditions for the same field', () => {
-      var criteria = new DbCriteria();
       criteria.where('a', 1);
       criteria.where('a', 2);
-      var result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy WHERE (dummy.a = 1 AND dummy.a = 2)');
+      var result = generator.select(criteria);
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a = 1 AND Store.a = 2)');
 
-      criteria = new DbCriteria();
+      criteria = new DbCriteria(Store);
       criteria.where('a', [
         criteria.gte(10),
         criteria.lte(100)
       ]);
-      result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy WHERE (dummy.a >= 10 AND dummy.a <= 100)');
+      result = generator.select(criteria);
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a >= 10 AND Store.a <= 100)');
 
-      criteria = new DbCriteria();
+      criteria = new DbCriteria(Store);
       criteria.where('a', [
         criteria.lte(10),
         criteria.gte(100)
       ], true);
-      result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy WHERE (dummy.a <= 10 OR dummy.a >= 100)');
+      result = generator.select(criteria);
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a <= 10 OR Store.a >= 100)');
     });
 
     it('should process IN', () => {
-      var criteria = new DbCriteria();
       criteria.where('a', criteria.in([1, 2, 3]));
 
-      var result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy WHERE (dummy.a IN (1, 2, 3))');
+      var result = generator.select(criteria);
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a IN (1, 2, 3))');
     });
 
     it('should process NOT IN', () => {
-      var criteria = new DbCriteria();
       criteria.where('a', criteria.nin([1, 2, 3]));
 
-      var result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy WHERE (dummy.a NOT IN (1, 2, 3))');
+      var result = generator.select(criteria);
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a NOT IN (1, 2, 3))');
     });
 
     it('should process normal operators', () => {
       var operators = _.chain(SqlGenerator.OPERATORS).keys().without('in', 'nin', 'eq').value();
 
       _.each(operators, (operator) => {
-        var criteria = new DbCriteria();
+        criteria = new DbCriteria(Store);
         criteria.where('a', criteria[operator](1));
 
-        var result = generator.select(criteria, meta);
-        expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy WHERE (dummy.a ' + SqlGenerator.OPERATORS[operator] + ' 1)');
+        var result = generator.select(criteria);
+        expect(result).toEqual(`SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a ${SqlGenerator.OPERATORS[operator]} 1)`);
       });
     });
 
     it('should use fields in the criteria', () => {
-      var criteria = new DbCriteria();
       criteria.where('a', 1);
       criteria.fields('b', 'c', 'd');
 
-      var result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.b AS "dummy.b", dummy.c AS "dummy.c", dummy.d AS "dummy.d" FROM dummy WHERE (dummy.a = 1)');
+      var result = generator.select(criteria);
+      expect(result).toEqual('SELECT Store.b AS "Store.b", Store.c AS "Store.c", Store.d AS "Store.d" FROM Store WHERE (Store.a = 1)');
     });
 
     it('should support order', () => {
-      var criteria = new DbCriteria();
       criteria.order('a', true);
       criteria.order('b', false);
 
-      var result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy ORDER BY a ASC, b DESC');
+      var result = generator.select(criteria);
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store ORDER BY a ASC, b DESC');
     });
 
     it('should support offset', () => {
-      var criteria = new DbCriteria();
       criteria.offset(10);
 
-      var result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy OFFSET 10');
+      var result = generator.select(criteria);
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store OFFSET 10');
     });
 
     it('should support limit', () => {
-      var criteria = new DbCriteria();
       criteria.limit(10);
 
-      var result = generator.select(criteria, meta);
-      expect(result).toEqual('SELECT dummy.firstName AS "dummy.firstName", dummy.lastName AS "dummy.lastName", dummy.name AS "dummy.name", dummy.id AS "dummy.id" FROM dummy LIMIT 10');
+      var result = generator.select(criteria);
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store LIMIT 10');
     });
   });
 
   describe('#insert', () => {
     it('should insert a single row', () => {
-      var result = generator.insert({
-        'a': 1,
-        'b': 2
-      }, meta);
+      criteria.setAttributes({
+        name: 'test'
+      });
 
-      expect(result).toEqual('INSERT INTO dummy (a, b) VALUES (1, 2)');
+      var result = generator.insert(criteria);
+
+      expect(result).toEqual(`INSERT INTO Store (name) VALUES ('test')`);
     });
 
     it('should insert a single row using noQuote option', () => {
-      var result = generator.insert({
-        'a': 1,
-        'b': 'GET_DATE()'
-      }, meta, {
+      criteria.setAttributes({
+        name: 'test',
+        b: 'GET_DATE()'
+      }, {
+        force: true
+      });
+
+      var result = generator.insert(criteria, {
         noQuote: ['b']
       });
 
-      expect(result).toEqual('INSERT INTO dummy (a, b) VALUES (1, GET_DATE())');
+      expect(result).toEqual(`INSERT INTO Store (name, b) VALUES ('test', GET_DATE())`);
     });
 
     it('should insert multiple rows', () => {
-      var result = generator.insert([
-        {
-          'a': 1,
-          'b': 2
-        },
-        {
-          'a': 3,
-          'b': 4
-        }
-      ], meta);
+      criteria.setAttributes([
+        {name: 'test1'},
+        {name: 'test2'}
+      ]);
 
-      expect(result).toEqual('INSERT INTO dummy (a, b) VALUES (1, 2), (3, 4)');
+      var result = generator.insert(criteria);
+
+      expect(result).toEqual(`INSERT INTO Store (name) VALUES ('test1'), ('test2')`);
     });
   });
 
   describe('#update', () => {
     it('should update a row', () => {
-      var result = generator.update({}, {
-        'a': 1,
-        'b': 2
-      }, meta);
+      criteria.setAttributes({
+        name: 'test'
+      });
 
-      expect(result).toEqual('UPDATE dummy SET a = 1, b = 2');
+      var result = generator.update(criteria);
+
+      expect(result).toEqual(`UPDATE Store SET name = 'test'`);
     });
 
     it('should update a row using WHERE', () => {
-      var criteria = new DbCriteria();
       criteria.where('c', 1);
+      criteria.setAttributes({
+        name: 'test'
+      });
 
-      var result = generator.update(criteria, {
-        'a': 1,
-        'b': 2
-      }, meta);
+      var result = generator.update(criteria);
 
-      expect(result).toEqual('UPDATE dummy SET a = 1, b = 2 WHERE (c = 1)');
-    });
-
-    it('should update a row using object as criteria', () => {
-      var result = generator.update({
-        where: {
-          'c': 1
-        }
-      }, {
-        'a': 1,
-        'b': 2
-      }, meta);
-
-      expect(result).toEqual('UPDATE dummy SET a = 1, b = 2 WHERE (c = 1)');
+      expect(result).toEqual(`UPDATE Store SET name = 'test' WHERE (c = 1)`);
     });
 
     it('should update a row using noQuote', () => {
-      var result = generator.update(null, {
-        'a': 1,
-        'b': 'GET_DATE()'
-      }, meta, {
+      criteria.setAttributes({
+        name: 'test',
+        b: 'GET_DATE()'
+      }, {
+        force: true
+      });
+
+      var result = generator.update(criteria, {
         noQuote: 'b'
       });
 
-      expect(result).toEqual('UPDATE dummy SET a = 1, b = GET_DATE()');
+      expect(result).toEqual(`UPDATE Store SET name = 'test', b = GET_DATE()`);
     });
   });
 
   describe('#delete', () => {
     it('should delete all rows', () => {
-      var result = generator.delete(null, meta);
+      var result = generator.delete(criteria);
 
-      expect(result).toEqual('DELETE FROM dummy');
+      expect(result).toEqual('DELETE FROM Store');
     });
 
     it('should delete rows using criteria', () => {
-      var criteria = new DbCriteria();
       criteria.where('c', 1);
-      var result = generator.delete(criteria, meta);
+      var result = generator.delete(criteria);
 
-      expect(result).toEqual('DELETE FROM dummy WHERE (c = 1)');
+      expect(result).toEqual('DELETE FROM Store WHERE (c = 1)');
     });
 
   });
 
   describe('#count', () => {
     it('should count all rows', () => {
-      var result = generator.count(null, meta);
+      var result = generator.count(criteria);
 
-      expect(result).toEqual('SELECT COUNT(id) FROM dummy');
+      expect(result).toEqual('SELECT COUNT(id) FROM Store');
     });
 
     it('should count rows using criteria', () => {
-      var criteria = new DbCriteria();
       criteria.where('c', 1);
       var result = generator.count(criteria, meta);
 
-      expect(result).toEqual('SELECT COUNT(id) FROM dummy WHERE (c = 1)');
+      expect(result).toEqual('SELECT COUNT(id) FROM Store WHERE (c = 1)');
     });
 
   });
@@ -398,37 +409,35 @@ describe('SqlGenerator', () => {
 
     describe('#insert', () => {
       it('should return all fields after inserting', () => {
-        var result = generator.insert({
-          'a': 1,
-          'b': 2
-        }, meta);
+        criteria.setAttributes({
+          name: 'test'
+        });
+        var result = generator.insert(criteria);
 
-        expect(result).toEqual('INSERT INTO dummy (a, b) VALUES (1, 2) RETURNING *');
+        expect(result).toEqual(`INSERT INTO Store (name) VALUES ('test') RETURNING *`);
       });
     });
 
     describe('#update', () => {
       it('should return all fields after updating', () => {
-        var result = generator.update({
-          where: {
-            'c': 1
-          }
-        }, {
-          'a': 1,
-          'b': 2
-        }, meta);
+        criteria.setAttributes({
+          name: 'test'
+        });
+        criteria.where({
+          c: 1
+        });
+        var result = generator.update(criteria);
 
-        expect(result).toEqual('UPDATE dummy SET a = 1, b = 2 WHERE (c = 1) RETURNING *');
+        expect(result).toEqual(`UPDATE Store SET name = 'test' WHERE (c = 1) RETURNING *`);
       });
     });
 
     describe('#delete', () => {
       it('should return all fields after deleting', () => {
-        var criteria = new DbCriteria();
         criteria.where('c', 1);
-        var result = generator.delete(criteria, meta);
+        var result = generator.delete(criteria);
 
-        expect(result).toEqual('DELETE FROM dummy WHERE (c = 1) RETURNING *');
+        expect(result).toEqual('DELETE FROM Store WHERE (c = 1) RETURNING *');
       });
 
     });

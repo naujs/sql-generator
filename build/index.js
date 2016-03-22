@@ -35,24 +35,13 @@ var OPERATORS = {
   'nin': 'NOT IN'
 };
 
-function getAllPropertiesFromMeta(meta) {
-  var properties = _.chain(meta.properties).clone().keys().value();
-  properties.push(meta.primaryKey);
-  var foreignKeys = _.chain(meta.relations).map(function (relation) {
-    // TODO: use constants here
-    if (relation.type == 'belongsTo') {
-      return relation.foreignKey;
-    }
-    return null;
-  }).compact().value();
-  return _.union(properties, foreignKeys);
-}
-
-function generateCriteria(type, stm, criteria, meta) {
+function generateCriteria(type, stm, criteria) {
+  var Model = criteria.getModelClass();
+  var modelName = Model.getModelName();
   // type can be `select`, `update` or `delete`
-  var where = generateWhereStatment(criteria.getWhere(), type == 'select' ? meta.modelName : null);
+  var where = generateWhereStatment(criteria.getWhere(), type == 'select' ? modelName : null);
   stm = stm.where(where.toString());
-  var tableName = meta.modelName;
+  var tableName = modelName;
 
   var fields = criteria.getFields();
   if (fields && fields.length && type == 'select') {
@@ -184,8 +173,55 @@ function processEngineSpecificDeleteQuery(del, engine) {
   }
 }
 
-function processEngineSpecificJoinQuery(select, engine, include, meta) {
-  return select;
+function convertIncludeIntoJoinQueryData(include, meta) {
+  var data = [];
+  var _iteratorNormalCompletion = true;
+  var _didIteratorError = false;
+  var _iteratorError = undefined;
+
+  try {
+    for (var _iterator = include[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+      var i = _step.value;
+
+      var includeRelation = include[i];
+      var relationName = includeRelation.relation;
+      var relation = meta.relations[relationName];
+
+      if (relation.type == 'belongsToAndHasMany') {}
+
+      var d = {
+        from: relationMeta.modelName,
+        primary: {
+          to: meta.modelName,
+          join: [relationMeta.foreignKey, meta.referenceKey]
+        }
+      };
+    }
+  } catch (err) {
+    _didIteratorError = true;
+    _iteratorError = err;
+  } finally {
+    try {
+      if (!_iteratorNormalCompletion && _iterator.return) {
+        _iterator.return();
+      }
+    } finally {
+      if (_didIteratorError) {
+        throw _iteratorError;
+      }
+    }
+  }
+}
+
+function processEngineSpecificJoinQuery(squel, engine, criteria, meta) {
+  switch (engine) {
+    case PSQL:
+      var mainSelect = squel.select().from('__result__');
+      var include = criteria.getInclude();
+      return select;
+    default:
+      return null;
+  }
 }
 
 var Generator = (function () {
@@ -198,39 +234,45 @@ var Generator = (function () {
 
   _createClass(Generator, [{
     key: 'select',
-    value: function select(filter, meta) {
-      var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
+    value: function select(criteria) {
+      var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 
-      var criteria = checkCriteria(filter);
+      var include = criteria.getInclude();
+      var modelName = criteria.getModelClass().getModelName();
+      var select;
+      if (include && include.length && this._engine) {
+        select = processEngineSpecificJoinQuery(this._squel, this._engine, criteria);
+        if (!select) {
+          console.warn(this._engine + ' does not support include');
+        }
+        return select.toString();
+      }
 
-      var select = this._squel.select().from(meta.modelName);
+      select = this._squel.select().from(modelName);
 
       // always explicitly specify fields
       var fields = criteria.getFields();
       if (!fields || !fields.length) {
-        var properties = getAllPropertiesFromMeta(meta);
+        var properties = criteria.getModelClass().getAllProperties();
         criteria.fields.apply(criteria, _toConsumableArray(properties));
       }
 
-      select = generateCriteria('select', select, criteria, meta);
-
-      var include = criteria.getInclude();
-      if (include && include.length) {
-        select = processEngineSpecificJoinQuery(select, this._engine, include, meta);
-      }
+      select = generateCriteria('select', select, criteria);
 
       return select.toString();
     }
   }, {
     key: 'insert',
-    value: function insert(attributes, meta) {
-      var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
+    value: function insert(criteria) {
+      var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 
+      var attributes = criteria.getAttributes();
+      var modelName = criteria.getModelClass().getModelName();
       if (!_.isArray(attributes) && !_.isObject(attributes) || !_.size(attributes)) {
         throw 'Invalid param';
       }
 
-      var insert = this._squel.insert().into(meta.modelName);
+      var insert = this._squel.insert().into(modelName);
 
       if (_.isArray(attributes)) {
         // Unfortunately, it is not possible to use native functions
@@ -246,17 +288,18 @@ var Generator = (function () {
     }
   }, {
     key: 'update',
-    value: function update(filter, attributes, meta) {
-      var options = arguments.length <= 3 || arguments[3] === undefined ? {} : arguments[3];
+    value: function update(criteria) {
+      var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 
-      var criteria = checkCriteria(filter);
+      var attributes = criteria.getAttributes();
+      var modelName = criteria.getModelClass().getModelName();
       if (!_.isObject(attributes) || !_.size(attributes)) {
         throw 'Invalid param';
       }
 
-      var update = this._squel.update().table(meta.modelName);
+      var update = this._squel.update().table(modelName);
       update = generateSet(update, attributes, options.noQuote);
-      update = generateCriteria('update', update, criteria, meta);
+      update = generateCriteria('update', update, criteria);
 
       update = processEngineSpecificUpdateQuery(update, this._engine);
 
@@ -264,13 +307,12 @@ var Generator = (function () {
     }
   }, {
     key: 'delete',
-    value: function _delete(filter, meta) {
-      var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
+    value: function _delete(criteria) {
+      var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 
-      var criteria = checkCriteria(filter);
-
-      var del = this._squel.delete().from(meta.modelName);
-      del = generateCriteria('delete', del, criteria, meta);
+      var modelName = criteria.getModelClass().getModelName();
+      var del = this._squel.delete().from(modelName);
+      del = generateCriteria('delete', del, criteria);
 
       del = processEngineSpecificDeleteQuery(del, this._engine);
 
@@ -278,13 +320,14 @@ var Generator = (function () {
     }
   }, {
     key: 'count',
-    value: function count(filter, meta) {
-      var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
+    value: function count(criteria) {
+      var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 
-      var criteria = checkCriteria(filter);
+      var modelName = criteria.getModelClass().getModelName();
+      var primaryKey = criteria.getModelClass().getPrimaryKey();
       var where = generateWhereStatment(criteria.getWhere());
 
-      var select = this._squel.select().from(meta.modelName).field('COUNT(' + meta.primaryKey + ')').where(where.toString());
+      var select = this._squel.select().from(modelName).field('COUNT(' + primaryKey + ')').where(where.toString());
 
       return select.toString();
     }

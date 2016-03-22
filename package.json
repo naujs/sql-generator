@@ -22,6 +22,9 @@
   "devDependencies": {
     "@naujs/gulp-tasks": "^0.1.1"
   },
+  "optionalDependencies": {
+    "@naujs/registry": "latest"
+  },
   "dependencies": {
     "@naujs/db-criteria": "^0.1.1",
     "lodash": "^3.10.1",
