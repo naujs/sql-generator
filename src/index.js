@@ -1,5 +1,7 @@
 'use strict';
 
+// TODO: Implement OFFSET for JOIN queries
+
 var DbCriteria = require('@naujs/db-criteria')
   , _ = require('lodash')
   , squel = require('squel');
@@ -44,13 +46,11 @@ function generateCriteria(type, stm, criteria) {
   if (fields && fields.length && type == 'select') {
     _.each(fields, (field) => {
       var name = `${tableName}.${field}`;
-      stm = stm.field(name, `"${name}"`);
+      stm = stm.field(name, name);
     });
   }
 
-  _.each(criteria.getOrder(), (direction, key) => {
-    stm = stm.order(key, direction);
-  });
+  stm = generateOrder(stm, criteria);
 
   // update doesnt have offset
   if (stm.offset) {
@@ -62,6 +62,13 @@ function generateCriteria(type, stm, criteria) {
     stm = stm.limit(limit);
   }
 
+  return stm;
+}
+
+function generateOrder(stm, criteria) {
+  _.each(criteria.getOrder(), (direction, key) => {
+    stm = stm.order(key, direction === 1);
+  });
   return stm;
 }
 
@@ -206,6 +213,9 @@ function generateWhereForSubSelectInLeftJoinQuery(subSelect, include) {
   var alias = null;
 
   switch (include.type) {
+    case 'belongsTo':
+      // It doesn't make any sense to perform where conditions for belongsTo
+      return subSelect;
     case 'hasManyAndBelongsTo':
       // In case of many-to-many, we need to refer to the main table to
       // perform where condition because the junction table does not have anything
@@ -238,11 +248,18 @@ function generatePsqlLeftJoinQuery(squel, criteria, cb, parentRelation) {
     subSelect = generateWhereForSubSelectInLeftJoinQuery(subSelect, include);
 
     var onCondition, partitionBy;
+    var orderBy = [];
+    var order = subCriteria ? subCriteria.getOrder() : {};
     switch (include.type) {
       case 'hasMany':
       case 'hasOne':
         onCondition = `${modelName}.${include.target.referenceKey} = ${joinAlias}.${include.target.foreignKey}`;
         partitionBy = `${include.relation}.${include.target.foreignKey}`;
+        // Generate order statements
+        for (let field in order) {
+          let direction = order[field];
+          orderBy.push(`${field} ${direction === 1 ? 'ASC' : 'DESC'}`);
+        }
         break;
       case 'belongsTo':
         // In this case, just JOIN 2 tables without any special sub query
@@ -255,12 +272,22 @@ function generatePsqlLeftJoinQuery(squel, criteria, cb, parentRelation) {
         onCondition = `${modelName}.${include.through.referenceKey} = ${joinAlias}.${include.through.foreignKey}`;
         partitionBy = `${include.relation}.${include.through.foreignKey}`;
         subSelect.left_join(include.target.modelName, null, `${include.relation}.${include.target.foreignKey} = ${include.target.modelName}.${include.target.referenceKey}`);
+        // Generate order statements
+        for (let field in order) {
+          let direction = order[field];
+          orderBy.push(`${include.target.modelName}.${field} ${direction === 1 ? 'ASC' : 'DESC'}`);
+        }
         break;
+    }
+
+    orderBy = orderBy.join(', ');
+    if (orderBy) {
+      orderBy = ' ORDER BY ' + orderBy;
     }
 
     if (partitionBy) {
       // For each rows returned, set the row number so that we can do limit later
-      subSelect.field(`ROW_NUMBER() OVER (PARTITION BY ${partitionBy})`, 'rn');
+      subSelect.field(`ROW_NUMBER() OVER (PARTITION BY ${partitionBy}${orderBy})`, 'rn');
     }
 
     queries.push([
@@ -314,7 +341,8 @@ function processEngineSpecificJoinQuery(squel, engine, criteria) {
         var subCriteria = include.target.criteria;
         if (subCriteria) {
           var limit = subCriteria.getLimit();
-          if (limit) {
+          // belongsTo relation indicates that there should be zero or one related row
+          if (limit && include.type != 'belongsTo') {
             var rn = `${prefix}.rn`;
             select.field(rn, `"${rn}"`);
             select.where(`${rn} <= ${limit} OR ${rn} IS NULL`);

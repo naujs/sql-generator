@@ -22,6 +22,11 @@ Store.relations = {
     type: 'hasMany',
     model: 'Banner',
     foreignKey: 'store_id'
+  },
+  owner: {
+    type: 'belongsTo',
+    model: 'Users',
+    foreignKey: 'user_id'
   }
 };
 
@@ -120,6 +125,11 @@ User.relations = {
     type: 'hasMany',
     model: 'Vote',
     foreignKey: 'user_id'
+  },
+  'stores': {
+    type: 'hasMany',
+    model: 'Store',
+    foreignKey: 'user_id'
   }
 };
 User.modelName = 'Users';
@@ -182,7 +192,7 @@ describe('SqlGenerator', () => {
       criteria.where('b', 2);
 
       var result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a = 1 AND Store.b = 2)');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE (Store.a = 1 AND Store.b = 2)');
     });
 
     it('should process OR', () => {
@@ -191,7 +201,7 @@ describe('SqlGenerator', () => {
       criteria.where('c', 3, true);
 
       var result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a = 1 AND Store.b = 2 OR Store.c = 3)');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE (Store.a = 1 AND Store.b = 2 OR Store.c = 3)');
     });
 
     it('should process nested DbCriteria query', () => {
@@ -205,7 +215,7 @@ describe('SqlGenerator', () => {
       criteria.where(nestedCriteria, true);
 
       var result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a = 1 AND Store.b = 2 OR Store.c = 3 OR (Store.d = 3 AND Store.e = 4))');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE (Store.a = 1 AND Store.b = 2 OR Store.c = 3 OR (Store.d = 3 AND Store.e = 4))');
     });
 
     it('should process complex conditions passed to DbCriteria constructor', () => {
@@ -222,7 +232,7 @@ describe('SqlGenerator', () => {
       });
 
       var result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (((Store.a = 1 OR Store.b = 2) AND Store.c = 3))');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE (((Store.a = 1 OR Store.b = 2) AND Store.c = 3))');
 
       criteria = new DbCriteria(Store, {
         where: {
@@ -243,7 +253,7 @@ describe('SqlGenerator', () => {
         }
       });
       result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a = 1 AND Store.b = 2 AND (Store.c = 3 OR Store.d = 4 OR (Store.e = 5 AND Store.f = 6 AND (Store.g = 7 OR Store.h = 8))))');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE (Store.a = 1 AND Store.b = 2 AND (Store.c = 3 OR Store.d = 4 OR (Store.e = 5 AND Store.f = 6 AND (Store.g = 7 OR Store.h = 8))))');
     });
 
     it('should support multiple or conditions for the same field passed to DbCriteria constructor', () => {
@@ -256,7 +266,7 @@ describe('SqlGenerator', () => {
         }
       });
       var result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE ((Store.a = 0 OR Store.a > 2))');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE ((Store.a = 0 OR Store.a > 2))');
     });
 
     it('should support multiple and conditions for the same field passed to DbCriteria constructor', () => {
@@ -269,7 +279,7 @@ describe('SqlGenerator', () => {
         }
       });
       var result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE ((Store.a = 0 AND Store.a > 2))');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE ((Store.a = 0 AND Store.a > 2))');
     });
 
     it('should support multiple nested conditions for the same field passed to DbCriteria constructor', () => {
@@ -307,14 +317,14 @@ describe('SqlGenerator', () => {
         }
       });
       var result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (((Store.a = 0 OR Store.a > 2 OR (Store.e = 2 AND Store.f < 3)) AND Store.b = 1))');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE (((Store.a = 0 OR Store.a > 2 OR (Store.e = 2 AND Store.f < 3)) AND Store.b = 1))');
     });
 
     it('should support multiple conditions for the same field', () => {
       criteria.where('a', 1);
       criteria.where('a', 2);
       var result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a = 1 AND Store.a = 2)');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE (Store.a = 1 AND Store.a = 2)');
 
       criteria = new DbCriteria(Store);
       criteria.where('a', [
@@ -322,7 +332,7 @@ describe('SqlGenerator', () => {
         criteria.lte(100)
       ]);
       result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a >= 10 AND Store.a <= 100)');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE (Store.a >= 10 AND Store.a <= 100)');
 
       criteria = new DbCriteria(Store);
       criteria.where('a', [
@@ -330,21 +340,21 @@ describe('SqlGenerator', () => {
         criteria.gte(100)
       ], true);
       result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a <= 10 OR Store.a >= 100)');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE (Store.a <= 10 OR Store.a >= 100)');
     });
 
     it('should process IN', () => {
       criteria.where('a', criteria.in([1, 2, 3]));
 
       var result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a IN (1, 2, 3))');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE (Store.a IN (1, 2, 3))');
     });
 
     it('should process NOT IN', () => {
       criteria.where('a', criteria.nin([1, 2, 3]));
 
       var result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a NOT IN (1, 2, 3))');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE (Store.a NOT IN (1, 2, 3))');
     });
 
     it('should process normal operators', () => {
@@ -355,7 +365,7 @@ describe('SqlGenerator', () => {
         criteria.where('a', criteria[operator](1));
 
         var result = generator.select(criteria);
-        expect(result).toEqual(`SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store WHERE (Store.a ${SqlGenerator.OPERATORS[operator]} 1)`);
+        expect(result).toEqual(`SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE (Store.a ${SqlGenerator.OPERATORS[operator]} 1)`);
       });
     });
 
@@ -368,25 +378,25 @@ describe('SqlGenerator', () => {
     });
 
     it('should support order', () => {
-      criteria.order('a', true);
-      criteria.order('b', false);
+      criteria.order('a');
+      criteria.order('b', -1);
 
       var result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store ORDER BY a ASC, b DESC');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store ORDER BY a ASC, b DESC');
     });
 
     it('should support offset', () => {
       criteria.offset(10);
 
       var result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store OFFSET 10');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store OFFSET 10');
     });
 
     it('should support limit', () => {
       criteria.limit(10);
 
       var result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id" FROM Store LIMIT 10');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store LIMIT 10');
     });
   });
 
@@ -504,18 +514,135 @@ describe('SqlGenerator', () => {
     });
 
     describe('#select', () => {
-      fit('should support include relations', () => {
-        criteria.include('products', {
-          include: {
-            relation: 'comments',
-            filter: {
-              limit: 2
-            }
-          },
-          limit: 2
-        });
+      it('should support include hasMany relations', () => {
+        criteria.include('products');
+
         var result = generator.select(criteria);
-        console.log(result);
+        expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", products.name AS "products.name", products.id AS "products.id", products.store_id AS "products.store_id" FROM Store LEFT JOIN (SELECT name, id, store_id, ROW_NUMBER() OVER (PARTITION BY products.store_id) AS rn FROM Product products) products ON (Store.id = products.store_id)');
+      });
+
+      it('should support include hasMany relations with limit', () => {
+        criteria.include('products', {
+          limit: 1
+        });
+
+        var result = generator.select(criteria);
+        expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", products.name AS "products.name", products.id AS "products.id", products.store_id AS "products.store_id", products.rn AS "products.rn" FROM Store LEFT JOIN (SELECT name, id, store_id, ROW_NUMBER() OVER (PARTITION BY products.store_id) AS rn FROM Product products) products ON (Store.id = products.store_id) WHERE (products.rn <= 1 OR products.rn IS NULL)');
+      });
+
+      it('should support include hasMany relations with where conditions', () => {
+        criteria.include('products', {
+          where: {
+            name: {
+              neq: 'Product 1'
+            }
+          }
+        });
+
+        var result = generator.select(criteria);
+        expect(result).toEqual(`SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", products.name AS "products.name", products.id AS "products.id", products.store_id AS "products.store_id" FROM Store LEFT JOIN (SELECT name, id, store_id, ROW_NUMBER() OVER (PARTITION BY products.store_id) AS rn FROM Product products WHERE (name <> 'Product 1')) products ON (Store.id = products.store_id)`);
+      });
+
+      it('should support include hasMany relations with order', () => {
+        criteria.include('products', {
+          order: {
+            name: -1
+          },
+          limit: 1
+        });
+
+        var result = generator.select(criteria);
+        expect(result).toEqual(`SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", products.name AS "products.name", products.id AS "products.id", products.store_id AS "products.store_id", products.rn AS "products.rn" FROM Store LEFT JOIN (SELECT name, id, store_id, ROW_NUMBER() OVER (PARTITION BY products.store_id ORDER BY name DESC) AS rn FROM Product products) products ON (Store.id = products.store_id) WHERE (products.rn <= 1 OR products.rn IS NULL)`);
+      });
+
+      it('should support include belongsTo relations', () => {
+        criteria.include('owner');
+
+        var result = generator.select(criteria);
+        expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", owner.name AS "owner.name", owner.id AS "owner.id" FROM Store LEFT JOIN (SELECT name, id FROM Users owner) owner ON (Store.user_id = owner.id)');
+      });
+
+      it('should ignore where conditions for belongsTo relations', () => {
+        criteria.include('owner', {
+          where: {
+            name: 'Test'
+          }
+        });
+
+        var result = generator.select(criteria);
+        expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", owner.name AS "owner.name", owner.id AS "owner.id" FROM Store LEFT JOIN (SELECT name, id FROM Users owner) owner ON (Store.user_id = owner.id)');
+      });
+
+      it('should ignore limit for belongsTo relations', () => {
+        criteria.include('owner', {
+          limit: 1
+        });
+
+        var result = generator.select(criteria);
+        expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", owner.name AS "owner.name", owner.id AS "owner.id" FROM Store LEFT JOIN (SELECT name, id FROM Users owner) owner ON (Store.user_id = owner.id)');
+      });
+
+      it('should ignore order for belongsTo relations', () => {
+        criteria.include('owner', {
+          order: {
+            name: -1
+          }
+        });
+
+        var result = generator.select(criteria);
+        expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", owner.name AS "owner.name", owner.id AS "owner.id" FROM Store LEFT JOIN (SELECT name, id FROM Users owner) owner ON (Store.user_id = owner.id)');
+      });
+
+      it('should support nested relations', () => {
+        criteria.include('owner', {
+          include: 'comments'
+        });
+
+        var result = generator.select(criteria);
+        expect(result).toEqual(`SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", owner.name AS "owner.name", owner.id AS "owner.id", owner$comments.content AS "owner$comments.content", owner$comments.id AS "owner$comments.id", owner$comments.user_id AS "owner$comments.user_id", owner$comments.product_id AS "owner$comments.product_id" FROM Store LEFT JOIN (SELECT name, id FROM Users owner) owner ON (Store.user_id = owner.id) LEFT JOIN (SELECT content, id, user_id, product_id, ROW_NUMBER() OVER (PARTITION BY comments.user_id) AS rn FROM Comment comments) owner$comments ON (owner.id = owner$comments.user_id)`);
+      });
+
+      it('should include many-to-many relations', () => {
+        criteria = new DbCriteria(Product);
+        criteria.include('tags');
+
+        var result = generator.select(criteria);
+        expect(result).toEqual(`SELECT Product.name AS "Product.name", Product.id AS "Product.id", Product.store_id AS "Product.store_id", tags.name AS "tags.name", tags.id AS "tags.id" FROM Product LEFT JOIN (SELECT Tag.name, Tag.id, tags.tag_id, tags.product_id, ROW_NUMBER() OVER (PARTITION BY tags.product_id) AS rn FROM ProductTag tags LEFT JOIN Tag ON (tags.tag_id = Tag.id)) tags ON (Product.id = tags.product_id)`);
+      });
+
+      it('should include many-to-many relations with where conditions', () => {
+        criteria = new DbCriteria(Product);
+        criteria.include('tags', {
+          where: {
+            name: 'Tag1'
+          }
+        });
+
+        var result = generator.select(criteria);
+        expect(result).toEqual(`SELECT Product.name AS "Product.name", Product.id AS "Product.id", Product.store_id AS "Product.store_id", tags.name AS "tags.name", tags.id AS "tags.id" FROM Product LEFT JOIN (SELECT Tag.name, Tag.id, tags.tag_id, tags.product_id, ROW_NUMBER() OVER (PARTITION BY tags.product_id) AS rn FROM ProductTag tags LEFT JOIN Tag ON (tags.tag_id = Tag.id) WHERE (Tag.name = 'Tag1')) tags ON (Product.id = tags.product_id)`);
+      });
+
+      it('should include many-to-many relations with limit', () => {
+        criteria = new DbCriteria(Product);
+        criteria.include('tags', {
+          limit: 1
+        });
+
+        var result = generator.select(criteria);
+        expect(result).toEqual(`SELECT Product.name AS "Product.name", Product.id AS "Product.id", Product.store_id AS "Product.store_id", tags.name AS "tags.name", tags.id AS "tags.id", tags.rn AS "tags.rn" FROM Product LEFT JOIN (SELECT Tag.name, Tag.id, tags.tag_id, tags.product_id, ROW_NUMBER() OVER (PARTITION BY tags.product_id) AS rn FROM ProductTag tags LEFT JOIN Tag ON (tags.tag_id = Tag.id)) tags ON (Product.id = tags.product_id) WHERE (tags.rn <= 1 OR tags.rn IS NULL)`);
+      });
+
+      it('should include many-to-many relations with order', () => {
+        criteria = new DbCriteria(Product);
+        criteria.include('tags', {
+          order: {
+            name: 1
+          },
+          limit: 1
+        });
+
+        var result = generator.select(criteria);
+        expect(result).toEqual(`SELECT Product.name AS "Product.name", Product.id AS "Product.id", Product.store_id AS "Product.store_id", tags.name AS "tags.name", tags.id AS "tags.id", tags.rn AS "tags.rn" FROM Product LEFT JOIN (SELECT Tag.name, Tag.id, tags.tag_id, tags.product_id, ROW_NUMBER() OVER (PARTITION BY tags.product_id ORDER BY Tag.name ASC) AS rn FROM ProductTag tags LEFT JOIN Tag ON (tags.tag_id = Tag.id)) tags ON (Product.id = tags.product_id) WHERE (tags.rn <= 1 OR tags.rn IS NULL)`);
       });
     });
 
