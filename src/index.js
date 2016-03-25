@@ -33,7 +33,10 @@ function generateCriteria(type, stm, criteria) {
   var Model = criteria.getModelClass();
   var modelName = Model.getModelName();
   // type can be `select`, `update` or `delete`
-  var where = generateWhereStatment(criteria.getWhere(), type == 'select' ? modelName : null);
+  // We only need alias for select queries to make it consistent with queries
+  // using JOIN
+  var whereAlias = type == 'select' ? modelName : null;
+  var where = generateWhereStatement(criteria.getWhere(), whereAlias);
   stm = stm.where(where.toString());
   var tableName = modelName;
 
@@ -41,7 +44,7 @@ function generateCriteria(type, stm, criteria) {
   if (fields && fields.length && type == 'select') {
     _.each(fields, (field) => {
       var name = `${tableName}.${field}`;
-      stm = stm.field(name, name);
+      stm = stm.field(name, `"${name}"`);
     });
   }
 
@@ -62,7 +65,7 @@ function generateCriteria(type, stm, criteria) {
   return stm;
 }
 
-function generateWhereStatment(where, alias, expr) {
+function generateWhereStatement(where, alias, expr) {
   if (!where || !where.length) {
     return '';
   }
@@ -77,7 +80,7 @@ function generateWhereStatment(where, alias, expr) {
         expr = expr.and_begin();
       }
 
-      expr = generateWhereStatment(condition.where, alias, expr);
+      expr = generateWhereStatement(condition.where, alias, expr);
       expr = expr.end();
     } else {
       var key = condition.key;
@@ -165,32 +168,164 @@ function processEngineSpecificDeleteQuery(del, engine) {
   }
 }
 
-function convertIncludeIntoJoinQueryData(include, meta) {
-  var data = [];
-  for (var i of include) {
-    var includeRelation = include[i];
-    var relationName = includeRelation.relation;
-    var relation = meta.relations[relationName];
-
-    if (relation.type == 'belongsToAndHasMany') {
-
-    }
-
-    var d = {
-      from: relationMeta.modelName,
-      primary: {
-        to: meta.modelName,
-        join: [relationMeta.foreignKey, meta.referenceKey]
+function generateSubSelectForLeftJoinQuery(squel, include) {
+  var subSelect;
+  switch (include.type) {
+    case 'hasMany':
+    case 'hasOne':
+    case 'belongsTo':
+      // For these types, generate a normal sub SELECT query
+      subSelect = squel.select().from(include.target.modelName, include.relation);
+      for (let j in include.target.properties) {
+        let prop = include.target.properties[j];
+        subSelect.field(`${prop}`);
       }
-    };
+      break;
+    case 'hasManyAndBelongsTo':
+      subSelect = squel.select().from(include.through.modelName, include.relation);
+      for (let j in include.target.properties) {
+        let prop = include.target.properties[j];
+        // Include all the fields from the joined table
+        subSelect.field(`${include.target.modelName}.${prop}`);
+      }
+      // also include 2 fields in the junction table to perform ON
+      subSelect.field(`${include.relation}.${include.target.foreignKey}`);
+      subSelect.field(`${include.relation}.${include.through.foreignKey}`);
+      break;
   }
+  return subSelect;
 }
 
-function processEngineSpecificJoinQuery(squel, engine, criteria, meta) {
+function generateWhereForSubSelectInLeftJoinQuery(subSelect, include) {
+  var criteria = include.target.criteria;
+  if (!criteria) return subSelect;
+
+  var where = criteria.getWhere();
+  if (!where.length) return subSelect;
+
+  var alias = null;
+
+  switch (include.type) {
+    case 'hasManyAndBelongsTo':
+      // In case of many-to-many, we need to refer to the main table to
+      // perform where condition because the junction table does not have anything
+      // For other cases, it is the other way around
+      alias = include.target.modelName;
+      break;
+  }
+
+  where = generateWhereStatement(where, alias);
+  subSelect.where(where.toString());
+  return subSelect;
+}
+
+function generatePsqlLeftJoinQuery(squel, criteria, cb, parentRelation) {
+  var queries = [];
+  var includeParams = criteria.getInclude();
+  // Use the parentRelation as main alias when available
+  var modelName = parentRelation ? parentRelation : criteria.getModelClass().getModelName();
+  for (var i in includeParams) {
+    var include = includeParams[i];
+
+    // Set the alias for the join table using parentRelation when available
+    var joinAlias = parentRelation ? `${parentRelation}$${include.relation}` : include.relation;
+    var subCriteria = include.target.criteria;
+
+    // Notify the outer function so that it can generate select field
+    cb(include, parentRelation);
+
+    var subSelect = generateSubSelectForLeftJoinQuery(squel, include);
+    subSelect = generateWhereForSubSelectInLeftJoinQuery(subSelect, include);
+
+    var onCondition, partitionBy;
+    switch (include.type) {
+      case 'hasMany':
+      case 'hasOne':
+        onCondition = `${modelName}.${include.target.referenceKey} = ${joinAlias}.${include.target.foreignKey}`;
+        partitionBy = `${include.relation}.${include.target.foreignKey}`;
+        break;
+      case 'belongsTo':
+        // In this case, just JOIN 2 tables without any special sub query
+        onCondition = `${modelName}.${include.target.foreignKey} = ${joinAlias}.${include.target.referenceKey}`;
+        break;
+      case 'hasManyAndBelongsTo':
+        // For many-to-many, we need to have another LEFT JOIN to join
+        // the other table in order to get correct fields
+        // Because the junction table usually does not have any data
+        onCondition = `${modelName}.${include.through.referenceKey} = ${joinAlias}.${include.through.foreignKey}`;
+        partitionBy = `${include.relation}.${include.through.foreignKey}`;
+        subSelect.left_join(include.target.modelName, null, `${include.relation}.${include.target.foreignKey} = ${include.target.modelName}.${include.target.referenceKey}`);
+        break;
+    }
+
+    if (partitionBy) {
+      // For each rows returned, set the row number so that we can do limit later
+      subSelect.field(`ROW_NUMBER() OVER (PARTITION BY ${partitionBy})`, 'rn');
+    }
+
+    queries.push([
+      subSelect,
+      joinAlias,
+      onCondition
+    ]);
+
+    // Recursively do all the nested criteria
+    if (subCriteria) {
+      var nestedInclude = subCriteria.getInclude();
+      if (nestedInclude && nestedInclude.length) {
+        queries = queries.concat(generatePsqlLeftJoinQuery(squel, subCriteria, cb, joinAlias));
+      }
+    }
+  }
+
+  return queries;
+}
+
+function processEngineSpecificJoinQuery(squel, engine, criteria) {
+  var modelName = criteria.getModelClass().getModelName();
+  var select = squel.select().from(modelName);
+
+  // Explicitly select fields from the main model
+  var fields = criteria.getFields();
+  if (!fields || !fields.length) {
+    fields = criteria.getModelClass().getAllProperties();
+  }
+
+  _.each(fields, (field) => {
+    select.field(`${modelName}.${field}`, `"${modelName}.${field}"`);
+  });
+
   switch(engine) {
     case PSQL:
-      var mainSelect = squel.select().from('__result__');
-      var include = criteria.getInclude();
+      var queries = generatePsqlLeftJoinQuery(squel, criteria, function(include, relation) {
+        // The naming convention is to use $ to separate relation and its relation
+        // For example: include('products', {include: 'comments'}) results in
+        // products$comments
+        var prefix = relation ? `${relation}$${include.relation}` : `${include.relation}`;
+
+        // For each include param, select all the fields
+        for (var j in include.target.properties) {
+          var prop = include.target.properties[j];
+          var name = `${prefix}.${prop}`;
+          select.field(name, `"${name}"`);
+        }
+
+        // Apply limit based on the row number (rn)
+        var subCriteria = include.target.criteria;
+        if (subCriteria) {
+          var limit = subCriteria.getLimit();
+          if (limit) {
+            var rn = `${prefix}.rn`;
+            select.field(rn, `"${rn}"`);
+            select.where(`${rn} <= ${limit} OR ${rn} IS NULL`);
+          }
+        }
+      });
+
+      _.each(queries, (q) => {
+        select.left_join(...q);
+      });
+
       return select;
     default:
       return null;
@@ -207,6 +342,7 @@ class Generator {
     var include = criteria.getInclude();
     var modelName = criteria.getModelClass().getModelName();
     var select;
+    // JOIN queries are special, therefore they are built separately
     if (include && include.length && this._engine) {
       select = processEngineSpecificJoinQuery(this._squel, this._engine, criteria);
       if (!select) {
@@ -280,7 +416,7 @@ class Generator {
   count(criteria, options = {}) {
     var modelName = criteria.getModelClass().getModelName();
     var primaryKey = criteria.getModelClass().getPrimaryKey();
-    var where = generateWhereStatment(criteria.getWhere());
+    var where = generateWhereStatement(criteria.getWhere());
 
     var select = this._squel.select()
                             .from(modelName)
