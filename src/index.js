@@ -32,6 +32,9 @@ const OPERATORS = {
 };
 
 const ROW_NUMBER_COL = '_rn_';
+const SELECT_OPTIONS = {
+  autoQuoteAliasNames: false // manually quote alias
+};
 
 function generateCriteria(type, stm, criteria) {
   var Model = criteria.getModelClass();
@@ -184,14 +187,14 @@ function generateSubSelectForLeftJoinQuery(squel, include) {
     case 'hasOne':
     case 'belongsTo':
       // For these types, generate a normal sub SELECT query
-      subSelect = squel.select().from(include.target.modelName, include.relation);
+      subSelect = squel.select(SELECT_OPTIONS).from(include.target.modelName, include.relation);
       for (let j in include.target.properties) {
         let prop = include.target.properties[j];
         subSelect.field(`${prop}`);
       }
       break;
     case 'hasManyAndBelongsTo':
-      subSelect = squel.select().from(include.through.modelName, include.relation);
+      subSelect = squel.select(SELECT_OPTIONS).from(include.through.modelName, include.relation);
       for (let j in include.target.properties) {
         let prop = include.target.properties[j];
         // Include all the fields from the joined table
@@ -312,7 +315,7 @@ function generatePsqlLeftJoinQuery(squel, criteria, cb, parentRelation) {
 
 function processEngineSpecificJoinQuery(squel, engine, criteria) {
   var modelName = criteria.getModelClass().getModelName();
-  var select = squel.select().from(modelName);
+  var select = squel.select(SELECT_OPTIONS).from(modelName);
 
   // Explicitly select fields from the main model
   var fields = criteria.getFields();
@@ -381,9 +384,7 @@ class Generator {
       return select.toString();
     }
 
-    select = this._squel.select({
-      autoQuoteAliasNames: false // manually quote alias
-    }).from(modelName);
+    select = this._squel.select(SELECT_OPTIONS).from(modelName);
 
     // always explicitly specify fields
     var fields = criteria.getFields();
