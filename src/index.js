@@ -46,7 +46,7 @@ function generateCriteria(type, stm, criteria) {
   if (fields && fields.length && type == 'select') {
     _.each(fields, (field) => {
       var name = `${tableName}.${field}`;
-      stm = stm.field(name, name);
+      stm = stm.field(name, `"${name}"`);
     });
   }
 
@@ -379,7 +379,9 @@ class Generator {
       return select.toString();
     }
 
-    select = this._squel.select().from(modelName);
+    select = this._squel.select({
+      autoQuoteAliasNames: false // manually quote alias
+    }).from(modelName);
 
     // always explicitly specify fields
     var fields = criteria.getFields();
