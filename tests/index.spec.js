@@ -518,7 +518,7 @@ describe('SqlGenerator', () => {
         criteria.include('products');
 
         var result = generator.select(criteria);
-        expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", products.name AS "products.name", products.id AS "products.id", products.store_id AS "products.store_id" FROM Store LEFT JOIN (SELECT name, id, store_id, ROW_NUMBER() OVER (PARTITION BY products.store_id) AS rn FROM Product products) products ON (Store.id = products.store_id)');
+        expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", products.name AS "products.name", products.id AS "products.id", products.store_id AS "products.store_id" FROM Store LEFT JOIN (SELECT name, id, store_id, ROW_NUMBER() OVER (PARTITION BY products.store_id) AS _rn_ FROM Product products) products ON (Store.id = products.store_id)');
       });
 
       it('should support include hasMany relations with limit', () => {
@@ -527,7 +527,7 @@ describe('SqlGenerator', () => {
         });
 
         var result = generator.select(criteria);
-        expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", products.name AS "products.name", products.id AS "products.id", products.store_id AS "products.store_id", products.rn AS "products.rn" FROM Store LEFT JOIN (SELECT name, id, store_id, ROW_NUMBER() OVER (PARTITION BY products.store_id) AS rn FROM Product products) products ON (Store.id = products.store_id) WHERE (products.rn <= 1 OR products.rn IS NULL)');
+        expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", products.name AS "products.name", products.id AS "products.id", products.store_id AS "products.store_id", products._rn_ AS "products._rn_" FROM Store LEFT JOIN (SELECT name, id, store_id, ROW_NUMBER() OVER (PARTITION BY products.store_id) AS _rn_ FROM Product products) products ON (Store.id = products.store_id) WHERE (products._rn_ <= 1 OR products._rn_ IS NULL)');
       });
 
       it('should support include hasMany relations with where conditions', () => {
@@ -540,7 +540,7 @@ describe('SqlGenerator', () => {
         });
 
         var result = generator.select(criteria);
-        expect(result).toEqual(`SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", products.name AS "products.name", products.id AS "products.id", products.store_id AS "products.store_id" FROM Store LEFT JOIN (SELECT name, id, store_id, ROW_NUMBER() OVER (PARTITION BY products.store_id) AS rn FROM Product products WHERE (name <> 'Product 1')) products ON (Store.id = products.store_id)`);
+        expect(result).toEqual(`SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", products.name AS "products.name", products.id AS "products.id", products.store_id AS "products.store_id" FROM Store LEFT JOIN (SELECT name, id, store_id, ROW_NUMBER() OVER (PARTITION BY products.store_id) AS _rn_ FROM Product products WHERE (name <> 'Product 1')) products ON (Store.id = products.store_id)`);
       });
 
       it('should support include hasMany relations with order', () => {
@@ -552,7 +552,7 @@ describe('SqlGenerator', () => {
         });
 
         var result = generator.select(criteria);
-        expect(result).toEqual(`SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", products.name AS "products.name", products.id AS "products.id", products.store_id AS "products.store_id", products.rn AS "products.rn" FROM Store LEFT JOIN (SELECT name, id, store_id, ROW_NUMBER() OVER (PARTITION BY products.store_id ORDER BY name DESC) AS rn FROM Product products) products ON (Store.id = products.store_id) WHERE (products.rn <= 1 OR products.rn IS NULL)`);
+        expect(result).toEqual(`SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", products.name AS "products.name", products.id AS "products.id", products.store_id AS "products.store_id", products._rn_ AS "products._rn_" FROM Store LEFT JOIN (SELECT name, id, store_id, ROW_NUMBER() OVER (PARTITION BY products.store_id ORDER BY name DESC) AS _rn_ FROM Product products) products ON (Store.id = products.store_id) WHERE (products._rn_ <= 1 OR products._rn_ IS NULL)`);
       });
 
       it('should support include belongsTo relations', () => {
@@ -599,7 +599,7 @@ describe('SqlGenerator', () => {
         });
 
         var result = generator.select(criteria);
-        expect(result).toEqual(`SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", owner.name AS "owner.name", owner.id AS "owner.id", owner$comments.content AS "owner$comments.content", owner$comments.id AS "owner$comments.id", owner$comments.user_id AS "owner$comments.user_id", owner$comments.product_id AS "owner$comments.product_id" FROM Store LEFT JOIN (SELECT name, id FROM Users owner) owner ON (Store.user_id = owner.id) LEFT JOIN (SELECT content, id, user_id, product_id, ROW_NUMBER() OVER (PARTITION BY comments.user_id) AS rn FROM Comment comments) owner$comments ON (owner.id = owner$comments.user_id)`);
+        expect(result).toEqual(`SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", owner.name AS "owner.name", owner.id AS "owner.id", owner$comments.content AS "owner$comments.content", owner$comments.id AS "owner$comments.id", owner$comments.user_id AS "owner$comments.user_id", owner$comments.product_id AS "owner$comments.product_id" FROM Store LEFT JOIN (SELECT name, id FROM Users owner) owner ON (Store.user_id = owner.id) LEFT JOIN (SELECT content, id, user_id, product_id, ROW_NUMBER() OVER (PARTITION BY comments.user_id) AS _rn_ FROM Comment comments) owner$comments ON (owner.id = owner$comments.user_id)`);
       });
 
       it('should include many-to-many relations', () => {
@@ -607,7 +607,7 @@ describe('SqlGenerator', () => {
         criteria.include('tags');
 
         var result = generator.select(criteria);
-        expect(result).toEqual(`SELECT Product.name AS "Product.name", Product.id AS "Product.id", Product.store_id AS "Product.store_id", tags.name AS "tags.name", tags.id AS "tags.id" FROM Product LEFT JOIN (SELECT Tag.name, Tag.id, tags.tag_id, tags.product_id, ROW_NUMBER() OVER (PARTITION BY tags.product_id) AS rn FROM ProductTag tags LEFT JOIN Tag ON (tags.tag_id = Tag.id)) tags ON (Product.id = tags.product_id)`);
+        expect(result).toEqual(`SELECT Product.name AS "Product.name", Product.id AS "Product.id", Product.store_id AS "Product.store_id", tags.name AS "tags.name", tags.id AS "tags.id" FROM Product LEFT JOIN (SELECT Tag.name, Tag.id, tags.tag_id, tags.product_id, ROW_NUMBER() OVER (PARTITION BY tags.product_id) AS _rn_ FROM ProductTag tags LEFT JOIN Tag ON (tags.tag_id = Tag.id)) tags ON (Product.id = tags.product_id)`);
       });
 
       it('should include many-to-many relations with where conditions', () => {
@@ -619,7 +619,7 @@ describe('SqlGenerator', () => {
         });
 
         var result = generator.select(criteria);
-        expect(result).toEqual(`SELECT Product.name AS "Product.name", Product.id AS "Product.id", Product.store_id AS "Product.store_id", tags.name AS "tags.name", tags.id AS "tags.id" FROM Product LEFT JOIN (SELECT Tag.name, Tag.id, tags.tag_id, tags.product_id, ROW_NUMBER() OVER (PARTITION BY tags.product_id) AS rn FROM ProductTag tags LEFT JOIN Tag ON (tags.tag_id = Tag.id) WHERE (Tag.name = 'Tag1')) tags ON (Product.id = tags.product_id)`);
+        expect(result).toEqual(`SELECT Product.name AS "Product.name", Product.id AS "Product.id", Product.store_id AS "Product.store_id", tags.name AS "tags.name", tags.id AS "tags.id" FROM Product LEFT JOIN (SELECT Tag.name, Tag.id, tags.tag_id, tags.product_id, ROW_NUMBER() OVER (PARTITION BY tags.product_id) AS _rn_ FROM ProductTag tags LEFT JOIN Tag ON (tags.tag_id = Tag.id) WHERE (Tag.name = 'Tag1')) tags ON (Product.id = tags.product_id)`);
       });
 
       it('should include many-to-many relations with limit', () => {
@@ -629,7 +629,7 @@ describe('SqlGenerator', () => {
         });
 
         var result = generator.select(criteria);
-        expect(result).toEqual(`SELECT Product.name AS "Product.name", Product.id AS "Product.id", Product.store_id AS "Product.store_id", tags.name AS "tags.name", tags.id AS "tags.id", tags.rn AS "tags.rn" FROM Product LEFT JOIN (SELECT Tag.name, Tag.id, tags.tag_id, tags.product_id, ROW_NUMBER() OVER (PARTITION BY tags.product_id) AS rn FROM ProductTag tags LEFT JOIN Tag ON (tags.tag_id = Tag.id)) tags ON (Product.id = tags.product_id) WHERE (tags.rn <= 1 OR tags.rn IS NULL)`);
+        expect(result).toEqual(`SELECT Product.name AS "Product.name", Product.id AS "Product.id", Product.store_id AS "Product.store_id", tags.name AS "tags.name", tags.id AS "tags.id", tags._rn_ AS "tags._rn_" FROM Product LEFT JOIN (SELECT Tag.name, Tag.id, tags.tag_id, tags.product_id, ROW_NUMBER() OVER (PARTITION BY tags.product_id) AS _rn_ FROM ProductTag tags LEFT JOIN Tag ON (tags.tag_id = Tag.id)) tags ON (Product.id = tags.product_id) WHERE (tags._rn_ <= 1 OR tags._rn_ IS NULL)`);
       });
 
       it('should include many-to-many relations with order', () => {
@@ -642,7 +642,7 @@ describe('SqlGenerator', () => {
         });
 
         var result = generator.select(criteria);
-        expect(result).toEqual(`SELECT Product.name AS "Product.name", Product.id AS "Product.id", Product.store_id AS "Product.store_id", tags.name AS "tags.name", tags.id AS "tags.id", tags.rn AS "tags.rn" FROM Product LEFT JOIN (SELECT Tag.name, Tag.id, tags.tag_id, tags.product_id, ROW_NUMBER() OVER (PARTITION BY tags.product_id ORDER BY Tag.name ASC) AS rn FROM ProductTag tags LEFT JOIN Tag ON (tags.tag_id = Tag.id)) tags ON (Product.id = tags.product_id) WHERE (tags.rn <= 1 OR tags.rn IS NULL)`);
+        expect(result).toEqual(`SELECT Product.name AS "Product.name", Product.id AS "Product.id", Product.store_id AS "Product.store_id", tags.name AS "tags.name", tags.id AS "tags.id", tags._rn_ AS "tags._rn_" FROM Product LEFT JOIN (SELECT Tag.name, Tag.id, tags.tag_id, tags.product_id, ROW_NUMBER() OVER (PARTITION BY tags.product_id ORDER BY Tag.name ASC) AS _rn_ FROM ProductTag tags LEFT JOIN Tag ON (tags.tag_id = Tag.id)) tags ON (Product.id = tags.product_id) WHERE (tags._rn_ <= 1 OR tags._rn_ IS NULL)`);
       });
     });
 

@@ -31,6 +31,8 @@ const OPERATORS = {
   'nin': 'NOT IN'
 };
 
+const ROW_NUMBER_COL = '_rn_';
+
 function generateCriteria(type, stm, criteria) {
   var Model = criteria.getModelClass();
   var modelName = Model.getModelName();
@@ -287,7 +289,7 @@ function generatePsqlLeftJoinQuery(squel, criteria, cb, parentRelation) {
 
     if (partitionBy) {
       // For each rows returned, set the row number so that we can do limit later
-      subSelect.field(`ROW_NUMBER() OVER (PARTITION BY ${partitionBy}${orderBy})`, 'rn');
+      subSelect.field(`ROW_NUMBER() OVER (PARTITION BY ${partitionBy}${orderBy})`, ROW_NUMBER_COL);
     }
 
     queries.push([
@@ -343,7 +345,7 @@ function processEngineSpecificJoinQuery(squel, engine, criteria) {
           var limit = subCriteria.getLimit();
           // belongsTo relation indicates that there should be zero or one related row
           if (limit && include.type != 'belongsTo') {
-            var rn = `${prefix}.rn`;
+            var rn = `${prefix}.${ROW_NUMBER_COL}`;
             select.field(rn, `"${rn}"`);
             select.where(`${rn} <= ${limit} OR ${rn} IS NULL`);
           }
