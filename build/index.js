@@ -77,8 +77,11 @@ function generateCriteria(type, stm, criteria) {
 }
 
 function generateOrder(stm, criteria) {
+  var Model = criteria.getModelClass();
+  var modelName = Model.getModelName();
+
   _.each(criteria.getOrder(), function (direction, key) {
-    stm = stm.order(key, direction === 1);
+    stm = stm.order(modelName + '.' + key, direction === 1);
   });
   return stm;
 }
@@ -260,7 +263,8 @@ function generatePsqlLeftJoinQuery(squel, criteria, cb, parentRelation) {
     var subSelect = generateSubSelectForLeftJoinQuery(squel, include);
     subSelect = generateWhereForSubSelectInLeftJoinQuery(subSelect, include);
 
-    var onCondition, partitionBy;
+    var onCondition = null;
+    var partitionBy = null;
     var orderBy = [];
     var order = subCriteria ? subCriteria.getOrder() : {};
     switch (include.type) {
@@ -390,17 +394,16 @@ var Generator = (function () {
         select = processEngineSpecificJoinQuery(this._squel, this._engine, criteria);
         if (!select) {
           console.warn(this._engine + ' does not support include');
+          return null;
         }
-        return select.toString();
-      }
-
-      select = this._squel.select(SELECT_OPTIONS).from(modelName);
-
-      // always explicitly specify fields
-      var fields = criteria.getFields();
-      if (!fields || !fields.length) {
-        var properties = criteria.getModelClass().getAllProperties();
-        criteria.fields.apply(criteria, _toConsumableArray(properties));
+      } else {
+        select = this._squel.select(SELECT_OPTIONS).from(modelName);
+        // always explicitly specify fields
+        var fields = criteria.getFields();
+        if (!fields || !fields.length) {
+          var properties = criteria.getModelClass().getAllProperties();
+          criteria.fields.apply(criteria, _toConsumableArray(properties));
+        }
       }
 
       select = generateCriteria('select', select, criteria);
@@ -457,6 +460,7 @@ var Generator = (function () {
       var options = arguments.length <= 1 || arguments[1] === undefined ? {} : arguments[1];
 
       var modelName = criteria.getModelClass().getModelName();
+
       var del = this._squel.delete().from(modelName);
       del = generateCriteria('delete', del, criteria);
 

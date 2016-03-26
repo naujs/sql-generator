@@ -378,11 +378,11 @@ describe('SqlGenerator', () => {
     });
 
     it('should support order', () => {
-      criteria.order('a');
-      criteria.order('b', -1);
+      criteria.order('name');
+      criteria.order('id', -1);
 
       var result = generator.select(criteria);
-      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store ORDER BY a ASC, b DESC');
+      expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store ORDER BY Store.name ASC, Store.id DESC');
     });
 
     it('should support offset', () => {
@@ -519,6 +519,14 @@ describe('SqlGenerator', () => {
 
         var result = generator.select(criteria);
         expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", products.name AS "products.name", products.id AS "products.id", products.store_id AS "products.store_id" FROM Store LEFT JOIN (SELECT name, id, store_id, ROW_NUMBER() OVER (PARTITION BY products.store_id) AS _rn_ FROM Product products) products ON (Store.id = products.store_id)');
+      });
+
+      it('should support include hasMany relations with correct order in the main model', () => {
+        criteria.include('products');
+        criteria.order('name', -1);
+
+        var result = generator.select(criteria);
+        expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id", products.name AS "products.name", products.id AS "products.id", products.store_id AS "products.store_id" FROM Store LEFT JOIN (SELECT name, id, store_id, ROW_NUMBER() OVER (PARTITION BY products.store_id) AS _rn_ FROM Product products) products ON (Store.id = products.store_id) ORDER BY Store.name DESC');
       });
 
       it('should support include hasMany relations with limit', () => {
