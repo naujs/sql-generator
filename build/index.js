@@ -6,11 +6,16 @@ var _createClass = (function () { function defineProperties(target, props) { for
 
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
 function _toConsumableArray(arr) { if (Array.isArray(arr)) { for (var i = 0, arr2 = Array(arr.length); i < arr.length; i++) { arr2[i] = arr[i]; } return arr2; } else { return Array.from(arr); } }
 
 var DbCriteria = require('@naujs/db-criteria'),
     _ = require('lodash'),
-    squel = require('squel');
+    squel = require('squel'),
+    Component = require('@naujs/component');
 
 function checkCriteria(criteria) {
   if (criteria instanceof DbCriteria) {
@@ -43,21 +48,32 @@ var SELECT_OPTIONS = {
 };
 
 function generateCriteria(type, stm, criteria) {
+  var options = arguments.length <= 3 || arguments[3] === undefined ? {} : arguments[3];
+
   var Model = criteria.getModelClass();
   var modelName = Model.getModelName();
   // type can be `select`, `update` or `delete`
   // We only need alias for select queries to make it consistent with queries
   // using JOIN
   var whereAlias = type == 'select' ? modelName : null;
-  var where = generateWhereStatement(criteria.getWhere(), whereAlias);
+
+  if (options.alias === false) {
+    whereAlias = null;
+  }
+
+  var where = generateWhereStatement.call(this, criteria.getWhere(), whereAlias);
   stm = stm.where(where.toString());
   var tableName = modelName;
 
   var fields = criteria.getFields();
   if (fields && fields.length && type == 'select') {
     _.each(fields, function (field) {
-      var name = tableName + '.' + field;
-      stm = stm.field(name, '"' + name + '"');
+      if (options.alias === false) {
+        stm = stm.field(field);
+      } else {
+        var name = tableName + '.' + field;
+        stm = stm.field(name, '"' + name + '"');
+      }
     });
   }
 
@@ -87,6 +103,8 @@ function generateOrder(stm, criteria) {
 }
 
 function generateWhereStatement(where, alias, expr) {
+  var _this = this;
+
   if (!where || !where.length) {
     return '';
   }
@@ -101,7 +119,7 @@ function generateWhereStatement(where, alias, expr) {
         expr = expr.and_begin();
       }
 
-      expr = generateWhereStatement(condition.where, alias, expr);
+      expr = generateWhereStatement.call(_this, condition.where, alias, expr);
       expr = expr.end();
     } else {
       var key = condition.key;
@@ -109,10 +127,22 @@ function generateWhereStatement(where, alias, expr) {
         key = alias + '.' + condition.key;
       }
       var stm = [key, OPERATORS[condition.operator], '?'].join(' ');
+
+      var value = condition.value;
+      if (condition.value instanceof DbCriteria) {
+        var _fields = condition.value.getFields();
+        if (_fields && _fields.length == 1) {
+          value = _this.select(condition.value, { raw: true, alias: false });
+        } else {
+          console.warn('Nested criteria in where condition must have 1 field, current value [%j]', _fields);
+          return;
+        }
+      }
+
       if (condition.or) {
-        expr = expr.or(stm, condition.value);
+        expr = expr.or(stm, value);
       } else {
-        expr = expr.and(stm, condition.value);
+        expr = expr.and(stm, value);
       }
     }
   });
@@ -373,12 +403,17 @@ function processEngineSpecificJoinQuery(squel, engine, criteria) {
   }
 }
 
-var Generator = (function () {
+var Generator = (function (_Component) {
+  _inherits(Generator, _Component);
+
   function Generator(engine) {
     _classCallCheck(this, Generator);
 
-    this._engine = engine ? engine.toLowerCase() : null;
-    this._squel = initSquelForSpecificEngine(this._engine);
+    var _this2 = _possibleConstructorReturn(this, Object.getPrototypeOf(Generator).call(this));
+
+    _this2._engine = engine ? engine.toLowerCase() : null;
+    _this2._squel = initSquelForSpecificEngine(_this2._engine);
+    return _this2;
   }
 
   _createClass(Generator, [{
@@ -406,8 +441,11 @@ var Generator = (function () {
         }
       }
 
-      select = generateCriteria('select', select, criteria);
+      select = generateCriteria.call(this, 'select', select, criteria, options);
 
+      if (options.raw) {
+        return select;
+      }
       return select.toString();
     }
   }, {
@@ -462,7 +500,7 @@ var Generator = (function () {
       var modelName = criteria.getModelClass().getModelName();
 
       var del = this._squel.delete().from(modelName);
-      del = generateCriteria('delete', del, criteria);
+      del = generateCriteria.call(this, 'delete', del, criteria);
 
       del = processEngineSpecificDeleteQuery(del, this._engine);
 
@@ -475,7 +513,7 @@ var Generator = (function () {
 
       var modelName = criteria.getModelClass().getModelName();
       var primaryKey = criteria.getModelClass().getPrimaryKey();
-      var where = generateWhereStatement(criteria.getWhere());
+      var where = generateWhereStatement.call(this, criteria.getWhere());
 
       var select = this._squel.select().from(modelName).field('COUNT(' + primaryKey + ')').where(where.toString());
 
@@ -484,7 +522,7 @@ var Generator = (function () {
   }]);
 
   return Generator;
-})();
+})(Component);
 
 Generator.OPERATORS = OPERATORS;
 Generator.PSQL = PSQL;

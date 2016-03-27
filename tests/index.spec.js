@@ -398,6 +398,20 @@ describe('SqlGenerator', () => {
       var result = generator.select(criteria);
       expect(result).toEqual('SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store LIMIT 10');
     });
+
+    it('should support nested criteria in where condition', () => {
+      criteria.where('a', 1);
+      criteria.where('b', new DbCriteria(Product, {where: {name: 'Test'}, fields: ['id']}));
+
+      var result = generator.select(criteria);
+      expect(result).toEqual(`SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE (Store.a = 1 AND Store.b = (SELECT id FROM Product WHERE (name = 'Test')))`);
+
+      criteria.where('b', {
+        nin: new DbCriteria(Product, {where: {name: 'Test'}, fields: ['id']})
+      });
+      result = generator.select(criteria);
+      expect(result).toEqual(`SELECT Store.name AS "Store.name", Store.id AS "Store.id", Store.user_id AS "Store.user_id" FROM Store WHERE (Store.a = 1 AND Store.b = (SELECT id FROM Product WHERE (name = 'Test')) AND Store.b NOT IN (SELECT id FROM Product WHERE (name = 'Test')))`);
+    });
   });
 
   describe('#insert', () => {
@@ -488,6 +502,18 @@ describe('SqlGenerator', () => {
       var result = generator.delete(criteria);
 
       expect(result).toEqual('DELETE FROM Store WHERE (c = 1)');
+    });
+
+    it('should support nested criteria', () => {
+      criteria = new DbCriteria(ProductTag);
+
+      criteria.where('product_id', 1);
+      criteria.where('tag_id', {
+        in: new DbCriteria(Tag, {where: {name: 'Tag1'}, fields: ['id']})
+      });
+      var result = generator.delete(criteria);
+
+      expect(result).toEqual(`DELETE FROM ProductTag WHERE (product_id = 1 AND tag_id IN (SELECT id FROM Tag WHERE (name = 'Tag1')))`);
     });
 
   });

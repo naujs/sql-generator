@@ -4,7 +4,8 @@
 
 var DbCriteria = require('@naujs/db-criteria')
   , _ = require('lodash')
-  , squel = require('squel');
+  , squel = require('squel')
+  , Component = require('@naujs/component');
 
 function checkCriteria(criteria) {
   if (criteria instanceof DbCriteria) {
@@ -36,22 +37,31 @@ const SELECT_OPTIONS = {
   autoQuoteAliasNames: false // manually quote alias
 };
 
-function generateCriteria(type, stm, criteria) {
+function generateCriteria(type, stm, criteria, options = {}) {
   var Model = criteria.getModelClass();
   var modelName = Model.getModelName();
   // type can be `select`, `update` or `delete`
   // We only need alias for select queries to make it consistent with queries
   // using JOIN
   var whereAlias = type == 'select' ? modelName : null;
-  var where = generateWhereStatement(criteria.getWhere(), whereAlias);
+
+  if (options.alias === false) {
+    whereAlias = null;
+  }
+
+  var where = generateWhereStatement.call(this, criteria.getWhere(), whereAlias);
   stm = stm.where(where.toString());
   var tableName = modelName;
 
   var fields = criteria.getFields();
   if (fields && fields.length && type == 'select') {
     _.each(fields, (field) => {
-      var name = `${tableName}.${field}`;
-      stm = stm.field(name, `"${name}"`);
+      if (options.alias === false) {
+        stm = stm.field(field);
+      } else {
+        var name = `${tableName}.${field}`;
+        stm = stm.field(name, `"${name}"`);
+      }
     });
   }
 
@@ -95,7 +105,7 @@ function generateWhereStatement(where, alias, expr) {
         expr = expr.and_begin();
       }
 
-      expr = generateWhereStatement(condition.where, alias, expr);
+      expr = generateWhereStatement.call(this, condition.where, alias, expr);
       expr = expr.end();
     } else {
       var key = condition.key;
@@ -103,10 +113,22 @@ function generateWhereStatement(where, alias, expr) {
         key = `${alias}.${condition.key}`;
       }
       var stm = [key, OPERATORS[condition.operator], '?'].join(' ');
+
+      var value = condition.value;
+      if (condition.value instanceof DbCriteria) {
+        var _fields = condition.value.getFields();
+        if (_fields && _fields.length == 1) {
+          value = this.select(condition.value, {raw: true, alias: false});
+        } else {
+          console.warn('Nested criteria in where condition must have 1 field, current value [%j]', _fields);
+          return;
+        }
+      }
+
       if (condition.or) {
-        expr = expr.or(stm, condition.value);
+        expr = expr.or(stm, value);
       } else {
-        expr = expr.and(stm, condition.value);
+        expr = expr.and(stm, value);
       }
     }
   });
@@ -369,8 +391,9 @@ function processEngineSpecificJoinQuery(squel, engine, criteria) {
   }
 }
 
-class Generator {
+class Generator extends Component {
   constructor(engine) {
+    super();
     this._engine = engine ? engine.toLowerCase() : null;
     this._squel = initSquelForSpecificEngine(this._engine);
   }
@@ -396,8 +419,11 @@ class Generator {
       }
     }
 
-    select = generateCriteria('select', select, criteria);
+    select = generateCriteria.call(this, 'select', select, criteria, options);
 
+    if (options.raw) {
+      return select;
+    }
     return select.toString();
   }
 
@@ -443,7 +469,7 @@ class Generator {
     var modelName = criteria.getModelClass().getModelName();
 
     var del = this._squel.delete().from(modelName);
-    del = generateCriteria('delete', del, criteria);
+    del = generateCriteria.call(this, 'delete', del, criteria);
 
     del = processEngineSpecificDeleteQuery(del, this._engine);
 
@@ -453,7 +479,7 @@ class Generator {
   count(criteria, options = {}) {
     var modelName = criteria.getModelClass().getModelName();
     var primaryKey = criteria.getModelClass().getPrimaryKey();
-    var where = generateWhereStatement(criteria.getWhere());
+    var where = generateWhereStatement.call(this, criteria.getWhere());
 
     var select = this._squel.select()
                             .from(modelName)
